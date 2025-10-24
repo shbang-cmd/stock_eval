@@ -93,8 +93,13 @@ slope_per_day <- coef(fit)[2]
 label_text <- paste0(
   "1일 평균 증가액 : ", comma(round(slope_per_day * 10000000, 0)), " (원/일)   ",
   "오늘평가액 : ", comma(round(tail(dd$Sum, 1), 0)), "   ",
+  "총수익 : ", comma(round(tail(dd$Profit, 1), 0)), 
+  "(", round(tail(dd$Return, 1)*100, 2), "%)   ",
   "전일대비 : ", comma(round(tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1], 0)),
-  "(", round((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) * 100 /  tail(dd$Sum, 1), 2), "%)"
+  " (",
+  ifelse((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) >= 0, "+", "-"),
+  round((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) * 100 / tail(dd$Sum, 1), 2),
+  "%)"
 )
 
 
