@@ -7,25 +7,34 @@
 # 
 # 출력파일(엑셀파일) : 종목별 평가금과 비중, 평가액을 보여주고 맨 아래에 총 평가금합계와 수익률을 보여준다.
 
-pkg = c("quantmod", "realxl", "writexl", "dplyr", "tidyverse", "scales")
+# install.packages("quantmod")
+# install.packages("readxl")
+# install.packages("writexl")
+# install.packages("dplyr")
+# install.packages("tidyverse")
+
+pkg = c("quantmod", "writexl", "dplyr", "tidyverse", "scales", "openxlsx")
 new.pkg = pkg[!(pkg %in% installed.packages()[, "Package"])]
 if (length(new.pkg)) {
   install.packages(new.pkg, dependencies = TRUE)
 }
 # ctrl + alt + e
-library(quantmod); library(readxl); library(writexl); library(dplyr); library(tidyverse); library(scales)
+library(quantmod)
+library(readxl)
+library(dplyr)
+library(tidyverse)
+library(scales)
+library(openxlsx)
 
-
-options(warn=-1)  # warning 표시 안함
 
 # 오늘의 날짜 문자열 생성
 today <- format(Sys.Date(), "%Y-%m-%d") 
 
 data <- read_csv("input_stock.csv",
                  #col_name = T,
-                 locale = locale("ko", encoding = "euc-kr"),
+                 locale = locale("ko", encoding = "utf-8"),
                  na = ".")
-data
+
 output_file <- paste(paste("output_stock_", today, sep = ""), ".xlsx", sep = "") # 출력파일명 뒤에 날짜삽입
 
 # Check its existence
@@ -49,7 +58,7 @@ for (i in 1:nrow(data)) {
   quantity <- data$수량[i]
   
   # 현재 주식 가격 가져오기
-  getSymbols(symbol, src = "yahoo", from = Sys.Date()-7, to = Sys.Date())
+  getSymbols(symbol, src = "yahoo", from = Sys.Date()-6, to = Sys.Date())
   current_price[i] <- as.numeric(last(get(symbol)[,4])) # symbol 종목의 open, high, low, close 가격에서 4번째 위치한 종가를 가져온다.
   
   amount[i] <- current_price[i] * quantity  # 종목별 평가액
@@ -85,8 +94,66 @@ data <- data %>% arrange(desc(평가금))
 summary_row <- data.frame(종목명 = paste("(", today, "합계", ")"), 종목번호 = NA, 보유증권사 = NA, 매수가격 = NA, 수량 = NA, 현재가 = NA, 평가금 = total_sum, 비중 = sum(stock_ratio), 수익금 = total_profit, 수익률 = total_profit / (total_sum - total_profit))
 data <- rbind(data, summary_row)
 
+
+
 # 결과를 엑셀 파일로 저장
-write_xlsx(data, output_file)
+#write_xlsx(data, output_file)
+
+# 새로운 엑셀 워크북 생성
+wb <- createWorkbook()
+
+# 워크시트 추가
+addWorksheet(wb, "Sheet 1")
+# 워크시트에 데이터 추가
+writeData(wb, sheet = "Sheet 1", data)
+# 데이터 막대를 조건부 서식으로 적용
+conditionalFormatting(
+  wb,
+  sheet = "Sheet 1",
+  cols = 7,            # 열에 데이터 막대 추가
+  rows = 2:nrow(data),    # 행(데이터 범위)
+  type = "databar",     # 데이터 막대 형식
+  showValue = TRUE     # 데이터 값 표시 여부
+)
+conditionalFormatting(
+  wb,
+  sheet = "Sheet 1",
+  cols = 8,            # 열에 데이터 막대 추가
+  rows = 2:nrow(data),    # 행(데이터 범위)
+  type = "databar",     # 데이터 막대 형식
+  showValue = TRUE     # 데이터 값 표시 여부
+)
+conditionalFormatting(
+  wb,
+  sheet = "Sheet 1",
+  cols = 9,            # 열에 데이터 막대 추가
+  rows = 2:nrow(data),    # 행(데이터 범위)
+  type = "databar",     # 데이터 막대 형식
+  showValue = TRUE     # 데이터 값 표시 여부
+)
+conditionalFormatting(
+  wb,
+  sheet = "Sheet 1",
+  cols = 10,            # 열에 데이터 막대 추가
+  rows = 2:(nrow(data)+1),    # 행(데이터 범위)
+  type = "databar",     # 데이터 막대 형식
+  showValue = TRUE     # 데이터 값 표시 여부
+)
+
+# Add Formatting to Spreadsheet
+#addStyle(wb, "Sheet 1", style = createStyle(numFmt = "#,##0.00"), rows = 2:nrow(data), cols = c(4:7, 9), gridExpand = T)
+#addStyle(wb, "Sheet 1", style = createStyle(numFmt = "#,##0"), rows = 2:(nrow(data)+1), cols = c(4:7, 9), gridExpand = T)
+#addStyle(wb, "Sheet 1", style = createStyle(numFmt = "0.0%"), rows = 2:(nrow(data)+1), cols = c(8, 10), gridExpand = T)
+
+
+setColWidths(wb, "Sheet 1", cols = 1:ncol(data), widths = "auto")  # auto width fit
+
+
+# 파일 저장
+saveWorkbook(wb, file = output_file, overwrite = TRUE)
+
+
+
 
 cat(nrow(data)-1, "개 종목의 수익금 계산이 완료되었습니다. 결과는", output_file, "에 저장되었습니다.")
 
@@ -100,7 +167,7 @@ new_data <- data %>%
   summarize(sec_tot = sum(평가금)) %>% 
   arrange(desc(sec_tot))
 new_data <- new_data %>% filter(!is.na(보유증권사))  # NA 제거
-
+new_data
 ggplot(data = new_data, aes(x = reorder(보유증권사, -sec_tot), y = sec_tot/1000000)) + 
   labs(x = "증권사", y = "보유액합계(백만원)") +
   geom_text(aes(label=sec_tot/1000000), vjust = -0.1) +

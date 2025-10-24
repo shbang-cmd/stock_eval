@@ -13,9 +13,14 @@ if (length(new.pkg)) {
   install.packages(new.pkg, dependencies = TRUE)
 }
 
-library(quantmod); library(readxl);library(writexl);library(dplyr);library(tidyverse);library(rvest);library(httr)
+library(quantmod)
+library(readxl)
+library(writexl)
+library(dplyr)
+library(tidyverse)
+library(rvest)
+library(httr)
 
-options(warn=-1)  # warning 표시 안함
 
 # 오늘의 날짜 문자열 생성
 today <- format(Sys.Date(), "%Y-%m-%d")
@@ -23,7 +28,7 @@ today <- format(Sys.Date(), "%Y-%m-%d")
 
 # 엑셀 파일 경로 설정
 data_en <- read_csv("input_stock_us.csv",
-                    locale = locale("ko", encoding = "euc-kr"),
+                    locale = locale("ko", encoding = "utf-8"),
                     na = ".")
 
 output_file <- paste(paste("output_stock_us_", today, sep = ""), ".xlsx", sep = "") # 출력파일명 뒤에 날짜삽입
@@ -51,7 +56,7 @@ for (i in 1:nrow(data_en)) {
   
   # 현재 주식 가격 가져오기
   #getSymbols(symbol, src = "yahoo", from = Sys.Date(), to = Sys.Date())
-  getSymbols(symbol, src = "yahoo", from = Sys.Date()-7, to = Sys.Date()) # 뉴욕과 시차때문에 from Date에서 하루 전 날짜로 설정해줌
+  getSymbols(symbol, src = "yahoo", from = Sys.Date()-6, to = Sys.Date()) # 뉴욕과 시차때문에 from Date에서 하루 전 날짜로 설정해줌
   
   current_price[i] <- as.numeric(last(get(symbol)[,4])) # symbol 종목의 open, high, low, close 가격에서 4번째 위치한 종가를 가져온다.
   

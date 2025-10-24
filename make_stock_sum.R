@@ -12,7 +12,7 @@ library(openxlsx); library(rvest); library(httr)
 library(dplyr); library(ggplot2); library(scales)
 library(patchwork)
 
-setwd("c:\\easy_r")
+setwd("c:\\easy_r\\easy_r")  # 워킹 디렉토리를 지정한다.(개별 설정이 다를 수 있음)
 source("stock_eval.R")
 source("stock_eval_us.R")
 
