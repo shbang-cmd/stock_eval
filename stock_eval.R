@@ -183,3 +183,29 @@ ggplot(new_data, aes(x = reorder(종목명, -종목평가합산), y = 종목평�
                        high = "blue", 
                        midpoint = 0)
 
+library(ggplot2)
+library(dplyr)
+
+# 🔹 1️⃣ 종목평가합산 기준으로 내림차순 정렬
+new_data <- new_data %>%
+  arrange(desc(종목평가합산)) %>%
+  mutate(종목명 = factor(종목명, levels = 종목명))
+
+# 🔹 2️⃣ 파이그래프 그리기
+ggplot(new_data, aes(x = "", y = 종목평가합산, fill = 종목명)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  coord_polar(theta = "y") +
+  labs(title = "종목별 비중 원그래프 (비중 순 정렬)", fill = "종목명") +
+  geom_text(
+    aes(
+      label = paste0(
+        round(종목평가합산 / sum(종목평가합산) * 100, 2), "%\n(",
+        종목명, ")"
+      )
+    ),
+    position = position_stack(vjust = 0.5),
+    size = 3
+  ) +
+  theme_void() +
+  scale_fill_manual(values = grDevices::rainbow(length(unique(new_data$종목명))))
+
