@@ -1,12 +1,3 @@
-# 주식명과 종목번호, 매수가와 수량을 넣으면
-# 자동으로 현재가를 가져와서 수익금과 수익률을 보여주는 R 코드(미국주식 버전)
-# 
-# 입력파일 : 엑셀에 맨 위에 "종목명", "종목번호", "보유증권사", "매수가격", "수량"의 필드명을 넣고
-# 그 아래에 각각 데이터를 넣고 저장한다. 파일명은 input_stock_us.xlsx로 만든다. 
-# 단, 종목번호는 finance.yahoo.com에서 조회가 가능한 종목티커를 넣는다. ex) SCHD
-# 
-# 출력파일 : 종목별 평가금과 비중, 평가액을 보여주고 맨 아래에 총 평가금합계와 수익률을 보여준다.
-
 pkg = c("quantmod", "realxl", "writexl", "dplyr", "tidyverse", "rvest", "httr")
 new.pkg = pkg[!(pkg %in% installed.packages()[, "Package"])]
 if (length(new.pkg)) {
@@ -20,16 +11,16 @@ library(dplyr)
 library(tidyverse)
 library(rvest)
 library(httr)
+library(readr)
 
 
 # 오늘의 날짜 문자열 생성
 today <- format(Sys.Date(), "%Y-%m-%d")
 #today <- format(Sys.Date()-1, "%Y-%m-%d")
 
-# 엑셀 파일 경로 설정
-data_en <- read_csv("input_stock_us.csv",
-                    locale = locale("ko", encoding = "utf-8"),
-                    na = ".")
+url <- "https://raw.githubusercontent.com/shbang-cmd/stock_eval/main/input_stock_us.csv"
+
+data_en <- read_csv(url, locale = locale(encoding = "UTF-8"))
 
 output_file <- paste(paste("output_stock_us_", today, sep = ""), ".xlsx", sep = "") # 출력파일명 뒤에 날짜삽입
 

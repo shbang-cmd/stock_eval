@@ -1,18 +1,3 @@
-# 주식명과 종목번호, 매수가와 수량을 넣으면
-# 자동으로 현재가를 가져와서 수익금과 수익률을 보여주는 R 코드
-# 
-# 입력파일(csv파일) : 맨 위에 "종목명", "종목번호", "보유증권사", "매수가격", "수량"의 필드명을 넣고
-# 그 아래에 각각 데이터를 넣고 저장한다. 파일명은 input_stock.csv로 만든다. 
-# 단, 종목번호는 finance.yahoo.com에서 조회가 가능한 종목번호를 넣는다. ex)삼성전자는 005930.KS
-# 
-# 출력파일(엑셀파일) : 종목별 평가금과 비중, 평가액을 보여주고 맨 아래에 총 평가금합계와 수익률을 보여준다.
-
-# install.packages("quantmod")
-# install.packages("readxl")
-# install.packages("writexl")
-# install.packages("dplyr")
-# install.packages("tidyverse")
-
 pkg = c("quantmod", "writexl", "dplyr", "tidyverse", "scales", "openxlsx")
 new.pkg = pkg[!(pkg %in% installed.packages()[, "Package"])]
 if (length(new.pkg)) {
@@ -25,15 +10,18 @@ library(dplyr)
 library(tidyverse)
 library(scales)
 library(openxlsx)
+library(readr)
 
 
 # 오늘의 날짜 문자열 생성
 today <- format(Sys.Date(), "%Y-%m-%d") 
 
-data <- read_csv("input_stock.csv",
-                 #col_name = T,
-                 locale = locale("ko", encoding = "utf-8"),
-                 na = ".")
+
+# CSV 파일 읽기
+url <- "https://raw.githubusercontent.com/shbang-cmd/stock_eval/main/input_stock.csv"
+
+data <- read_csv(url, locale = locale(encoding = "UTF-8"))
+
 
 output_file <- paste(paste("output_stock_", today, sep = ""), ".xlsx", sep = "") # 출력파일명 뒤에 날짜삽입
 
