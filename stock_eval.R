@@ -11,6 +11,8 @@ library(tidyverse)
 library(scales)
 library(openxlsx)
 library(readr)
+library(ggplot2)
+library(dplyr)
 
 
 # 오늘의 날짜 문자열 생성
@@ -20,7 +22,7 @@ today <- format(Sys.Date(), "%Y-%m-%d")
 # CSV 파일 읽기
 url <- "https://raw.githubusercontent.com/shbang-cmd/stock_eval/main/input_stock.csv"
 
-data <- read_csv(url, locale = locale(encoding = "UTF-8"))
+data <- read_csv(url, locale = locale(encoding = "UTF-8"), show_col_types = FALSE)
 
 
 output_file <- paste(paste("output_stock_", today, sep = ""), ".xlsx", sep = "") # 출력파일명 뒤에 날짜삽입
@@ -143,7 +145,7 @@ saveWorkbook(wb, file = output_file, overwrite = TRUE)
 
 
 
-cat(nrow(data)-1, "개 종목의 수익금 계산이 완료되었습니다. 결과는", output_file, "에 저장되었습니다.")
+#cat(nrow(data)-1, "개 국내 종목의 수익금 계산이 완료되었습니다. 결과는", output_file, "에 저장되었습니다.")
 
 data_ko <- data
 View(data_ko)
@@ -172,7 +174,7 @@ new_data_to_display <- new_data %>%
   mutate(종목평가합산 = comma(종목평가합산)) %>% 
   mutate(합산수량 = comma(합산수량)) %>% 
   mutate(수익금합산 = comma(수익금합산))
-print(new_data_to_display, n=50)
+#print(new_data_to_display, n=50)
 
 ggplot(new_data, aes(x = reorder(종목명, -종목평가합산), y = 종목평가합산/1000000, fill=수익금합산/종목평가합산)) + 
   scale_x_discrete(guide = guide_axis(angle = 30)) +
@@ -183,8 +185,6 @@ ggplot(new_data, aes(x = reorder(종목명, -종목평가합산), y = 종목평�
                        high = "blue", 
                        midpoint = 0)
 
-library(ggplot2)
-library(dplyr)
 
 # 🔹 1️⃣ 종목평가합산 기준으로 내림차순 정렬
 new_data <- new_data %>%
@@ -208,4 +208,3 @@ ggplot(new_data, aes(x = "", y = 종목평가합산, fill = 종목명)) +
   ) +
   theme_void() +
   scale_fill_manual(values = grDevices::rainbow(length(unique(new_data$종목명))))
-

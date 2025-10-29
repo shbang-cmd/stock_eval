@@ -70,7 +70,8 @@ repeat {
                                 Date   = col_date(format = ""),
                                 Sum    = col_double(),
                                 Profit = col_double()
-                              ))
+                              ), 
+                              show_col_types = FALSE)
     
     # ✅ 마지막 행의 Date가 오늘이면 삭제
     if (nrow(existing_data) > 0 && tail(existing_data$Date, 1) == Sys.Date()) {
@@ -86,9 +87,9 @@ repeat {
   
   write_csv(updated_data, output_file)
   
-  cat("성공적으로 데이터를 추가했습니다! 합산금은 : ",
-      sum_value, "원 총수익금은 :", profit_value, "총수익률 : ",
-      profit_value / (sum_value - profit_value), "\n")
+  # cat("성공적으로 데이터를 추가했습니다! 합산금은 : ",
+  #     sum_value, "원 총수익금은 :", profit_value, "총수익률 : ",
+  #     profit_value / (sum_value - profit_value), "\n")
   
   # 5) 분석용 데이터 재읽기 (Date 파싱 보장)
   dd <- read_csv(output_file,
@@ -118,7 +119,6 @@ repeat {
   fit <- lm(sum_left ~ as.numeric(Date), data = dd)
   slope_per_day <- coef(fit)[2]
   label_text <- paste0(
-    "1일 평균 증가액 : ", comma(round(slope_per_day * 10000000, 0)), " (원/일)   ",
     "오늘평가액 : ", comma(round(tail(dd$Sum, 1), 0)), "   ",
     "총수익 : ", comma(round(tail(dd$Profit, 1), 0)), 
     "(", round(tail(dd$Return, 1)*100, 2), "%)   ",
@@ -126,10 +126,16 @@ repeat {
     " (",
     ifelse((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) >= 0, "+", ""),
     round((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) * 100 / tail(dd$Sum, 1), 2),
-    "%)"
+    "%)" ,
+    "  1일 평균 증가액 : ", comma(round(slope_per_day * 10000000, 0)), "(원/일)   "
   )
-  
-  
+  print(label_text)
+  print(
+    paste(
+      "국내주식수 :", dim(data1)[1] - 1,
+      " 해외주식수 :", dim(data2)[1] - 2
+    )
+  )
   
   p <- ggplot(dd, aes(x = Date)) +
     geom_point(aes(y = sum_left, color = Profit / 10000000), size = 5) +
@@ -159,16 +165,17 @@ repeat {
   
   # 보조: 선형모형(날짜 → Sum)
   model <- lm(Sum / 10000000 ~ as.numeric(Date), data = dd)
-  cat("1일증가당 Sum 변화(원단위) : ", coef(model)[2] * 10000000, "\n")
   
-  cat("평가액 최고였던 날짜 : ")
-  print(dd[which.max(dd$Sum), 1:3])
+  #cat("1일증가당 Sum 변화(원단위) : ", coef(model)[2] * 10000000, "\n")
   
-  cat("평가액 최저였던 날짜 : ")
-  print(dd[which.min(dd$Sum), 1:3])
+  #cat("평가액 최고였던 날짜 : ")
+  #print(dd[which.max(dd$Sum), 1:3])
   
-  cat("최대합계 - 최소합계 차이 : ")
-  print(dd[which.max(dd$Sum), 2] - dd[which.min(dd$Sum), 2])
+  #cat("평가액 최저였던 날짜 : ")
+  #print(dd[which.min(dd$Sum), 1:3])
+  
+  #cat("최대합계 - 최소합계 차이 : ")
+  #print(dd[which.max(dd$Sum), 2] - dd[which.min(dd$Sum), 2])
   
   # CAGR 함수 및 계산 (Date 형 보장)
   calc_cagr <- function(start_date, end_date, start_value, end_value) {
@@ -192,9 +199,9 @@ repeat {
   mdd_start_sum <- dd$Sum[mdd_start_idx]
   mdd_end_sum   <- dd$Sum[mdd_end_idx]
   
-  cat("MDD(최대하락폭): ", scales::percent(-mdd_value, accuracy = 0.01), "\n")
-  cat("피크→바닥 구간 : ", format(mdd_start_date), " → ", format(mdd_end_date), "\n", sep = "")
-  cat("평가금액    : ", scales::comma(mdd_start_sum), " → ", scales::comma(mdd_end_sum), " (원)\n", sep = "")
+  #cat("MDD(최대하락폭): ", scales::percent(-mdd_value, accuracy = 0.01), "\n")
+  #cat("피크→바닥 구간 : ", format(mdd_start_date), " → ", format(mdd_end_date), "\n", sep = "")
+  #cat("평가금액    : ", scales::comma(mdd_start_sum), " → ", scales::comma(mdd_end_sum), " (원)\n", sep = "")
   
   peak_label   <- paste0("피크\n", scales::comma(mdd_start_sum), "원\n(", format(mdd_start_date), ")")
   trough_label <- paste0("바닥\n", scales::comma(mdd_end_sum), "원\n(", format(mdd_end_date), ")")
@@ -229,8 +236,8 @@ repeat {
   
   combined_plot <- p / p_dd + plot_layout(heights = c(2, 1))
   print(combined_plot)
-  print(tail(dd,20))
-  cat("1시간 후에 다시 실행됩니다...(중단을 원하면 Interrupt-R 빨간버튼 클릭)\n\n")
+  print(tail(dd,2))
+  cat("1시간 후에 다시 실행됩니다...(중단을 원하면 Interrupt-R 빨간버튼 클릭)",format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"),"\n\n")
   
   # 1시간 대기
   Sys.sleep(3600)
@@ -238,3 +245,6 @@ repeat {
   # 반복 횟수 증가
   count <- count + 1
 }
+
+# Drawdown 10%이상 떨어진날 보는 코드 : 
+# dd %>% filter(abs(DD) > 0.1)

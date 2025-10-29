@@ -20,7 +20,7 @@ today <- format(Sys.Date(), "%Y-%m-%d")
 
 url <- "https://raw.githubusercontent.com/shbang-cmd/stock_eval/main/input_stock_us.csv"
 
-data_en <- read_csv(url, locale = locale(encoding = "UTF-8"))
+data_en <- read_csv(url, locale = locale(encoding = "UTF-8"), show_col_types = FALSE)
 
 output_file <- paste(paste("output_stock_us_", today, sep = ""), ".xlsx", sep = "") # 출력파일명 뒤에 날짜삽입
 
@@ -108,7 +108,7 @@ data <- rbind(data, summary_row_en)
 # 결과를 엑셀 파일로 저장
 write_xlsx(data, output_file)
 
-cat(nrow(data)-1, "개 종목의 수익금 계산이 완료되었습니다. 결과는", output_file, "에 저장되었습니다.")
+#cat(nrow(data)-1, "개 미국종목의 수익금 계산이 완료되었습니다. 결과는", output_file, "에 저장되었습니다.")
 
 data_en <- data
 View(data_en)
@@ -151,7 +151,7 @@ new_data <- data %>%
 new_data <- new_data[-1,]    # 첫번째 행 제거
 new_data <- new_data[-1,]    # 첫번째 행 제거
 new_data$rate = new_data$종목평가합산 / sum(new_data$종목평가합산)
-print(new_data, n=30)
+#print(new_data, n=30)
 
 ggplot(new_data, aes(x = reorder(종목명, -종목평가합산), y = 종목평가합산/1000000, fill=수익금합산/종목평가합산)) + 
   scale_x_discrete(guide = guide_axis(angle = 30)) +
@@ -161,4 +161,3 @@ ggplot(new_data, aes(x = reorder(종목명, -종목평가합산), y = 종목평�
   scale_fill_gradient2(low = "red", 
                        high = "blue", 
                        midpoint = 0)
-
