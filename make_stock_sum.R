@@ -160,8 +160,9 @@ repeat {
              y = max(sum_left, na.rm = TRUE),
              label = label_text,
              hjust = 0, vjust = 1, size = 5, color = "black")
-  
-  print(p)
+  suppressMessages(
+    print(p)
+  )
   
   # 보조: 선형모형(날짜 → Sum)
   model <- lm(Sum / 10000000 ~ as.numeric(Date), data = dd)
@@ -232,10 +233,15 @@ repeat {
     labs(title = "Drawdown", x = "날짜", y = "Drawdown (%)") +
     theme_minimal(base_size = 13)
   
-  print(p_dd)
+  suppressMessages(
+    print(p_dd)
+  )
   
   combined_plot <- p / p_dd + plot_layout(heights = c(2, 1))
-  print(combined_plot)
+  suppressMessages(
+    print(combined_plot)
+  )
+  
   print(tail(dd,2))
   cat("1시간 후에 다시 실행됩니다...(중단을 원하면 Interrupt-R 빨간버튼 클릭)",format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"),"\n\n")
   
