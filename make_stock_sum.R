@@ -18,7 +18,7 @@ repeat {
   # 현재 시간과 반복 횟수 출력
   cat("[", count, "회차]", format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"), ": 실행 시작\n")
   
-  setwd("c:\\easy_r")  # 워킹 디렉토리를 지정한다.(개별 설정이 다를 수 있음)
+  setwd("c:\\easy_r\\easy_r")  # 워킹 디렉토리를 지정한다.(개별 설정이 다를 수 있음)
   source("stock_eval.R")
   source("stock_eval_us.R")
   
@@ -113,7 +113,8 @@ repeat {
   
   start_date <- format(min(dd$Date, na.rm = TRUE), "%Y-%m-%d")
   end_date   <- format(max(dd$Date, na.rm = TRUE), "%Y-%m-%d")
-  plot_title <- paste0("주식평가액 분석 (", start_date, " ~ ", end_date, ")")
+  plot_title <- paste0("주식평가액 분석 (", start_date, " ~ ", end_date, ")  ",
+                       format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분"))
   
   # Date는 숫자형으로 변환해 회귀 (안전)
   fit <- lm(sum_left ~ as.numeric(Date), data = dd)
@@ -243,7 +244,8 @@ repeat {
   )
   
   print(tail(dd,2))
-  cat("1시간 후에 다시 실행됩니다...(중단을 원하면 Interrupt-R 빨간버튼 클릭)",format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"),"\n\n")
+  cat("1시간 후에 다시 실행됩니다...(중단을 원하면 Interrupt-R 빨간버튼 클릭)",
+      format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"),"\n\n")
   
   # 1시간 대기
   Sys.sleep(3600)
