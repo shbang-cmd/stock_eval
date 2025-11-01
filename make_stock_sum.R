@@ -217,10 +217,10 @@ repeat {
     scale_color_gradient(low = "red", high = "blue") +
     scale_x_date(breaks = scales::breaks_pretty(n = max(1, floor(nrow(dd) * 0.1)))) +
     scale_y_continuous(
-      name = "천만원",
-      sec.axis = sec_axis(~ (. - b) / a, name = "Return (%)")
+      name = "보유합계(천만원)",
+      sec.axis = sec_axis(~ (. - b) / a, name = "수익률(%)")
     ) +
-    labs(title = plot_title, x = "날짜(월)", color = "수익 (천만원)") +
+    labs(title = plot_title, x = "날짜(월)", color = "수익") +
     theme_minimal(base_size = 13) +
     theme(axis.title.y.right = element_text(color = "green"),
           legend.position = "right",
