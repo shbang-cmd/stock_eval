@@ -180,6 +180,9 @@ repeat {
   # print(t)
   # 
   
+  s <- data_ko %>% filter(str_detect(종목명, "채권|금현물"))
+  # 한국 etf 중에서 채권이나 금현물이 들어간 종목을 골라낸다.
+  safety_ratio = round(sum(s$평가금) / tail(dd, 1)[2] * 100, 2)
   
     
   # Date는 숫자형으로 변환해 회귀 (안전)
@@ -198,7 +201,8 @@ repeat {
     "(증분)1개월간 :", format(result$Diff[1], big.mark = ","), 
     "    3개월간 :", format(result$Diff[2], big.mark = ","), 
     "    6개월간 :", format(result$Diff[3], big.mark = ","), 
-    "    1년간   :", format(result$Diff[4], big.mark = ",")
+    "    1년간   :", format(result$Diff[4], big.mark = ","), "\n",
+    "안전자산(금, 채권) 비율 : ", safety_ratio, "%"
   )
   #print(label_text)
   print(
