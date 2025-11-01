@@ -220,11 +220,11 @@ repeat {
   # 구성비율 트리맵 그리기
   dt_ko <- data_ko %>% 
     head(-1) %>% 
-    select(종목명, 종목번호, 평가금)
+    select(종목명, 종목번호, 보유증권사, 평가금)
   
   dt_en <- data_en %>% 
     head(-2) %>% 
-    select(종목명, 종목번호, 평가금)
+    select(종목명, 종목번호, 보유증권사, 평가금)
   
   dt_ko <- dt_ko %>% 
     mutate(한화평가금 = 평가금)
@@ -232,7 +232,7 @@ repeat {
   dt_en <- dt_en %>% 
     mutate(한화평가금 = 평가금 * exchange_rate)
   
-  dt_fn <- rbind(dt_ko, dt_en)  # 한국주식 + 미국주식
+  dt_fn <- bind_rows(dt_ko, dt_en)  # 한국주식 + 미국주식
   
   # hp <- sum(dt_fn$한화평가금)
   # 
@@ -371,61 +371,51 @@ repeat {
   
   
   
-  # 전일(정확히는 오늘을 제외한 가장 최근일) 저장한 엑셀을 읽어와서 전일대비 표시
   get_prev_file <- function(prefix = "output_stock_", ext = "xlsx") {
     pattern <- paste0("^", prefix, "\\d{4}-\\d{2}-\\d{2}\\.", ext, "$")
     files <- dir(pattern = pattern)
     if (length(files) == 0) return(NA)
-    
-    # 파일명에서 날짜 추출
     dates <- as.Date(sub(paste0(prefix, "(\\d{4}-\\d{2}-\\d{2})\\.", ext), "\\1", files))
-    
-    # 오늘 날짜 제외
     valid_idx <- which(dates < Sys.Date())
     if (length(valid_idx) == 0) return(NA)
-    
-    # 오늘 이전 중 가장 최근 파일 선택
-    latest_file <- files[which.max(dates[valid_idx])]
-    latest_file
+    files[which.max(dates[valid_idx])]
   }
-  setwd("c:\\easy_r\\easy_r")
   
-  # 사용 예시
-  cat(get_prev_file("output_stock_"))
-  cat(get_prev_file("output_stock_us_"))
-  
+  # ── 전일 데이터 불러오기 ──────────────────────────────
   data_prev_ko <- read_excel(get_prev_file("output_stock_"))
   data_prev_en <- read_excel(get_prev_file("output_stock_us_"))
   
-  data_prev_ko <- data_prev_ko %>% 
-    head(-1) %>% 
-    select("종목번호","전일한화평가금" = "평가금")
-  data_prev_en <- data_prev_en %>% 
-    head(-2) %>% 
-    mutate(한화평가금 = 평가금 * exchange_rate) %>% 
-    select("종목번호","전일한화평가금" = "한화평가금")
-  data_prev_fn <- bind_rows(data_prev_ko, data_prev_en) 
-  data_prev_fn <- data_prev_fn %>% 
+  data_prev_ko <- data_prev_ko %>%
+    head(-1) %>%
+    select(종목번호, 보유증권사, 전일한화평가금 = 평가금)
+  
+  data_prev_en <- data_prev_en %>%
+    head(-2) %>%
+    mutate(한화평가금 = 평가금 * exchange_rate) %>%
+    select(종목번호, 보유증권사, 전일한화평가금 = 한화평가금)
+  
+  data_prev_fn <- bind_rows(data_prev_ko, data_prev_en) %>%
     arrange(desc(전일한화평가금))
   
+  # ── 오늘 vs 전일 비교 함수 ──────────────────────────────
   join_stock_data <- function(today_df, prev_df) {
     today_df %>%
-      left_join(prev_df, by = "종목번호") %>%
+      distinct(종목번호, 보유증권사, .keep_all = TRUE) %>%
+      left_join(prev_df, by = c("종목번호", "보유증권사")) %>%
       mutate(
         전일대비 = 한화평가금 - 전일한화평가금,
-        전일대비율 = round((한화평가금 - 전일한화평가금) / 전일한화평가금 * 100, 2)
+        전일대비율 = if_else(
+          is.na(전일한화평가금),
+          NA_real_,
+          round((한화평가금 - 전일한화평가금) / 전일한화평가금 * 100, 2)
+        )
       ) %>%
       arrange(desc(한화평가금))
   }
   
-  # 종목번호를 고유하게 만든다
-  dt_fn <- dt_fn %>% distinct(종목번호, .keep_all = TRUE)
-  data_prev_fn <- data_prev_fn %>% distinct(종목번호, .keep_all = TRUE)
-  
+  # ── 실행 ──────────────────────────────
   rt <- join_stock_data(dt_fn, data_prev_fn)
   View(rt)
-  
-  
   
   
   
