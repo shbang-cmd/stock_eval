@@ -22,7 +22,7 @@ GOOG,			GOOG,		한투미니스탁,	141.56,		1.37998
 NDAQ,			NDAQ,		한투미니스탁,	65.16,		1.17417
 TSLA,			TSLA,		한투미니스탁,	297.03,		0.019773
 AAPL,			AAPL,		NH증권,		144.48,		0.779893
-NVDA,			NVDA,		NH증권,		99.24,		0.903597
+NVDA,			NVDA,		NH증권,		101.23,		0.91335
 T,				T,			NH증권,		35.38,		13
 AAPL,			AAPL,		NH증권,		111.63,		3
 SRET,			SRET,		NH증권,		37.49,		7
@@ -31,3 +31,4 @@ ADAM,			ADAM,		NH증권,		12.57,		3
 QCOM,			QCOM,		NH증권,		87.86,		4
 WBD,			WBD,		NH증권,		24.07,		3
 BRK-B,			BRK-B,		삼성증권,		508.4809,	0.107595
+
