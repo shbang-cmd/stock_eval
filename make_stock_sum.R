@@ -117,8 +117,6 @@ repeat {
                        format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분"))
 
   
-  
-  
   df <- dd[1:2]
   
   # 날짜형 변환
@@ -180,9 +178,10 @@ repeat {
   # print(t)
   # 
   
-  s <- data_ko %>% filter(str_detect(종목명, "채권|금현물"))
+  s <- data_ko %>% filter(str_detect(종목명, "채권|국채|금현물"))
   # 한국 etf 중에서 채권이나 금현물이 들어간 종목을 골라낸다.
-  safety_ratio = round(sum(s$평가금) / tail(dd, 1)[2] * 100, 2)
+  safety_sum = sum(s$평가금)
+  safety_ratio = round(safety_sum / tail(dd, 1)[2] * 100, 2)
   
     
   # Date는 숫자형으로 변환해 회귀 (안전)
@@ -202,7 +201,8 @@ repeat {
     "    3개월간 :", format(result$Diff[2], big.mark = ","), 
     "    6개월간 :", format(result$Diff[3], big.mark = ","), 
     "    1년간   :", format(result$Diff[4], big.mark = ","), "\n",
-    "안전자산(금, 채권) 비율 : ", safety_ratio, "%"
+    "안전자산(금, 채권) 비율 : ", safety_ratio, "%(", 
+    format(safety_sum, big.mark = ","),"원)"
   )
   #print(label_text)
   print(
