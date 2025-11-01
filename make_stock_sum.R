@@ -115,7 +115,73 @@ repeat {
   end_date   <- format(max(dd$Date, na.rm = TRUE), "%Y-%m-%d")
   plot_title <- paste0("주식평가액 분석 (", start_date, " ~ ", end_date, ")  ",
                        format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분"))
+
   
+  
+  
+  df <- dd[1:2]
+  
+  # 날짜형 변환
+  df$Date <- as.Date(df$Date)
+  
+  # 마지막 날짜
+  last_date <- max(df$Date, na.rm = TRUE)
+  
+  # 비교할 기간 벡터 (1개월, 3개월, 6개월, 12개월)
+  periods <- c(1, 3, 6, 12)
+  
+  # 한 달 단위로 Sum값 비교
+  result <- data.frame(
+    Period = paste0(periods, "개월 전"),
+    Target_Date = as.Date(NA),
+    Closest_Date = as.Date(NA),
+    Sum = NA,
+    Diff = NA
+  )
+  
+  for (i in seq_along(periods)) {
+    # 목표 날짜 계산
+    target <- seq(last_date, length = 2, by = paste0("-", periods[i], " month"))[2]
+    
+    # 실제 데이터 중 가장 가까운 날짜
+    idx <- which.min(abs(df$Date - target))
+    closest_date <- df$Date[idx]
+    sum_value <- df$Sum[idx]
+    
+    # 마지막 날짜의 Sum
+    latest_sum <- df$Sum[df$Date == last_date]
+    
+    # 차이 계산
+    diff_value <- latest_sum - sum_value
+    
+    # 결과 저장
+    result[i, ] <- c(
+      paste0(periods[i], "개월 전"),
+      as.character(target),
+      as.character(closest_date),
+      sum_value,
+      diff_value
+    )
+  }
+  
+  # 수치형 변환
+  result$Sum <- as.numeric(result$Sum)
+  result$Diff <- as.numeric(result$Diff)
+  
+  # 결과 출력
+  #print(result)
+  # t <- paste(
+  #   "1개월간 :", format(result$Diff[1], big.mark = ","), 
+  #   "  3개월간 :", format(result$Diff[2], big.mark = ","), 
+  #   "  6개월간 :", format(result$Diff[3], big.mark = ","), 
+  #   "  1년간 :", format(result$Diff[4], big.mark = ",")
+  # )
+  # 
+  # print(t)
+  # 
+  
+  
+    
   # Date는 숫자형으로 변환해 회귀 (안전)
   fit <- lm(sum_left ~ as.numeric(Date), data = dd)
   slope_per_day <- coef(fit)[2]
@@ -128,9 +194,13 @@ repeat {
     ifelse((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) >= 0, "+", ""),
     round((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) * 100 / tail(dd$Sum, 1), 2),
     "%)" ,
-    "  1일 평균 증가액 : ", comma(round(slope_per_day * 10000000, 0)), "(원/일)   "
+    "  1일 평균 증가액 : ", comma(round(slope_per_day * 10000000, 0)), "(원/일)   \n",
+    "(증분)1개월간 :", format(result$Diff[1], big.mark = ","), 
+    "    3개월간 :", format(result$Diff[2], big.mark = ","), 
+    "    6개월간 :", format(result$Diff[3], big.mark = ","), 
+    "    1년간   :", format(result$Diff[4], big.mark = ",")
   )
-  print(label_text)
+  #print(label_text)
   print(
     paste(
       "국내주식수 :", dim(data1)[1] - 1,
