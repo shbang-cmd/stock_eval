@@ -1,6 +1,6 @@
 # 1) 필요한 패키지 전부 설치
 pkg <- c("openxlsx", "rvest", "httr", "patchwork", "ggplot2",
-         "readr", "readxl", "dplyr", "scales")
+         "readr", "readxl", "dplyr", "scales", "treemap")
 new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
 if (length(new.pkg)) {
   install.packages(new.pkg, dependencies = TRUE)
@@ -10,7 +10,9 @@ if (length(new.pkg)) {
 library(readr); library(readxl)
 library(openxlsx); library(rvest); library(httr)
 library(dplyr); library(ggplot2); library(scales)
-library(patchwork)
+library(patchwork);library(treemap)
+
+options(scipen = 999)  # 지수표기(Scientific notation) 끄기
 
 count <- 1  # 반복 횟수 카운터
 
@@ -212,6 +214,54 @@ repeat {
     )
   )
   
+  
+  
+  
+  # 구성비율 트리맵 그리기
+  dt_ko <- data_ko %>% 
+    head(-1) %>% 
+    select(종목명, 종목번호, 평가금)
+  
+  dt_en <- data_en %>% 
+    head(-2) %>% 
+    select(종목명, 종목번호, 평가금)
+  
+  dt_ko <- dt_ko %>% 
+    mutate(한화평가금 = 평가금)
+  
+  dt_en <- dt_en %>% 
+    mutate(한화평가금 = 평가금 * exchange_rate)
+  
+  dt_fn <- rbind(dt_ko, dt_en)  # 한국주식 + 미국주식
+  
+  hp <- sum(dt_fn$한화평가금)
+  
+  dt_fn <- dt_fn %>% 
+    mutate(구성비율 = 한화평가금 / hp)
+  
+  dt_fn <- dt_fn %>% 
+    arrange(desc(한화평가금))
+  
+  View(dt_fn)  # 한국주식과 미국주식 합친 테이블
+  
+  treemap(
+    dt_fn,
+    index = "종목명",
+    vSize = "한화평가금",
+    title = "구성비율 트리맵",
+    palette = "Set3",
+    fontsize.labels = 18,
+    fontcolor.labels = "black",
+    fontface.labels = 2,
+    bg.labels = 0,
+    overlap.labels = 0.5,
+    inflate.labels = TRUE,                 # 작아도 표시
+    align.labels = list(c("center","center")) # 중앙 정렬
+  )
+  
+  
+  
+  
   p <- ggplot(dd, aes(x = Date)) +
     geom_point(aes(y = sum_left, color = Profit / 10000000), size = 5) +
     geom_line(aes(y = sum_left, group = 1), color = "gray") +
@@ -235,9 +285,9 @@ repeat {
              y = max(sum_left, na.rm = TRUE),
              label = label_text,
              hjust = 0, vjust = 1, size = 5, color = "black")
-  suppressMessages(
-    print(p)
-  )
+  # suppressMessages(
+  #   print(p)
+  # )
   
   # 보조: 선형모형(날짜 → Sum)
   model <- lm(Sum / 10000000 ~ as.numeric(Date), data = dd)
@@ -308,9 +358,9 @@ repeat {
     labs(title = "Drawdown", x = "날짜", y = "Drawdown (%)") +
     theme_minimal(base_size = 13)
   
-  suppressMessages(
-    print(p_dd)
-  )
+  # suppressMessages(
+  #   print(p_dd)
+  # )
   
   combined_plot <- p / p_dd + plot_layout(heights = c(2, 1))
   suppressMessages(
