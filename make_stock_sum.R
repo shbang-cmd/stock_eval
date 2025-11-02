@@ -1,6 +1,6 @@
 # 1) 필요한 패키지 전부 설치
 pkg <- c("openxlsx", "rvest", "httr", "patchwork", "ggplot2",
-         "readr", "readxl", "dplyr", "scales", "treemap")
+         "readr", "readxl", "dplyr", "scales", "treemap", "DT")
 new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
 if (length(new.pkg)) {
   install.packages(new.pkg, dependencies = TRUE)
@@ -10,7 +10,7 @@ if (length(new.pkg)) {
 library(readr); library(readxl)
 library(openxlsx); library(rvest); library(httr)
 library(dplyr); library(ggplot2); library(scales)
-library(patchwork);library(treemap)
+library(patchwork);library(treemap);library(DT)
 
 options(scipen = 999)  # 지수표기(Scientific notation) 끄기
 
@@ -403,21 +403,41 @@ repeat {
       distinct(종목번호, 보유증권사, .keep_all = TRUE) %>%
       left_join(prev_df, by = c("종목번호", "보유증권사")) %>%
       mutate(
-        전일대비 = 한화평가금 - 전일한화평가금,
+        한화평가금 = trunc(한화평가금),               
+        전일한화평가금 = trunc(전일한화평가금),       
+        전일대비 = trunc(한화평가금 - 전일한화평가금), 
+        
+        # 소수점 둘째자리까지 반올림 후 고정 표시
         전일대비율 = if_else(
           is.na(전일한화평가금),
-          NA_real_,
-          round((한화평가금 - 전일한화평가금) / 전일한화평가금 * 100, 2)
-        )
+          NA_character_,
+          sprintf("%.2f", round((한화평가금 - 전일한화평가금) / 전일한화평가금 * 100, 2))
+        ),
+        
+        비중 = sprintf("%.2f", round(한화평가금 / sum(한화평가금, na.rm = TRUE) * 100, 2))
       ) %>%
       arrange(desc(한화평가금))
   }
   
   # ── 실행 ──────────────────────────────
   rt <- join_stock_data(dt_fn, data_prev_fn)
-  View(rt)
-  
-  
+  print(datatable(rt, options = list(
+    pageLength = 100,
+    columnDefs = list(
+      list(targets = c("전일대비율", "비중"), className = "dt-right")  
+    )
+  )) %>%
+    formatCurrency(
+      columns = c("한화평가금", "전일한화평가금", "전일대비"),
+      currency = "",
+      mark = ",",
+      digits = 0
+    ) %>%
+    formatRound(
+      columns = c("전일대비율", "비중"),  # ⬅️ 소수점 둘째 자리까지 반올림 표시
+      digits = 2
+    )
+  )
   
   
   
