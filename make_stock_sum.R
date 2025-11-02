@@ -220,17 +220,19 @@ repeat {
   # 구성비율 트리맵 그리기
   dt_ko <- data_ko %>% 
     head(-1) %>% 
-    select(종목명, 종목번호, 보유증권사, 평가금)
+    select(종목명, 종목번호, 보유증권사, 평가금, 매수가격, 수량)
   
   dt_en <- data_en %>% 
     head(-2) %>% 
-    select(종목명, 종목번호, 보유증권사, 평가금)
+    select(종목명, 종목번호, 보유증권사, 평가금, 매수가격, 수량)
   
   dt_ko <- dt_ko %>% 
-    mutate(한화평가금 = 평가금)
+    mutate(한화평가금 = 평가금) %>% 
+    mutate(한화매수가격 = 매수가격)
   
   dt_en <- dt_en %>% 
-    mutate(한화평가금 = 평가금 * exchange_rate)
+    mutate(한화평가금 = 평가금 * exchange_rate) %>% 
+    mutate(한화매수가격 = 매수가격 * exchange_rate)
   
   dt_fn <- bind_rows(dt_ko, dt_en)  # 한국주식 + 미국주식
   
@@ -420,24 +422,84 @@ repeat {
   }
   
   # ── 실행 ──────────────────────────────
-  rt <- join_stock_data(dt_fn, data_prev_fn)
-  print(datatable(rt, options = list(
-    pageLength = 100,
-    columnDefs = list(
-      list(targets = c("전일대비율", "비중"), className = "dt-right")  
-    )
-  )) %>%
-    formatCurrency(
-      columns = c("한화평가금", "전일한화평가금", "전일대비"),
-      currency = "",
-      mark = ",",
-      digits = 0
-    ) %>%
-    formatRound(
-      columns = c("전일대비율", "비중"),  # ⬅️ 소수점 둘째 자리까지 반올림 표시
-      digits = 2
-    )
+  rt <- join_stock_data(dt_fn, data_prev_fn) %>%
+    mutate(
+      총매수금 = 한화매수가격 * 수량,                          # 매수금(원)
+      총수익금 = 한화평가금 - 총매수금,                   # 총수익금 계산
+      총수익률 = round((총수익금 / 총매수금) * 100, 2)    # 총수익률(%) 계산
+    ) %>% 
+    select(-매수가격) %>% 
+    select(종목명, 보유증권사, 한화매수가격, 수량, 한화평가금, 전일한화평가금,
+           전일대비, 전일대비율, 비중, 총매수금, 총수익금, 총수익률)
+  
+  # print(datatable(rt, options = list(
+  #   pageLength = 100,
+  #   columnDefs = list(
+  #     list(targets = c("전일대비율", "비중","총수익률"), className = "dt-right")  
+  #   )
+  # )) %>%
+  #   formatCurrency(
+  #     columns = c("한화평가금","한화평가금", "한화매수가격","전일한화평가금", "전일대비", "총매수금", "총수익금"),
+  #     currency = "",
+  #     mark = ",",
+  #     digits = 0
+  #   ) %>%
+  #   formatRound(
+  #     columns = c("전일대비율", "비중"),  # ⬅️ 소수점 둘째 자리까지 반올림 표시
+  #     digits = 2
+  #   )
+  # )
+  
+  print(
+    datatable(rt, options = list(
+      pageLength = 100,
+      columnDefs = list(
+        list(targets = c("전일대비율", "비중", "총수익률"), className = "dt-right")
+      )
+    )) %>%
+      formatCurrency(
+        columns = c("한화평가금", "한화매수가격", "전일한화평가금", "전일대비", "총매수금", "총수익금"),
+        currency = "",
+        mark = ",",
+        digits = 0
+      ) %>%
+      formatRound(
+        columns = c("전일대비율", "비중", "총수익률"),
+        digits = 2
+      ) %>%
+      # 🎨 조건부 서식: 음수값은 빨간색, 양수는 파란색
+      formatStyle(
+        columns = c("전일대비", "총수익금"),
+        color = styleInterval(0, c("red", "blue")),
+        fontWeight = styleInterval(0, c("bold", "normal"))
+      ) %>%
+      formatStyle(
+        columns = c("전일대비율", "총수익률"),
+        color = JS(
+          "function(value) {
+          // 문자열인 경우에도 숫자 추출
+          var num = parseFloat(value);
+          if (!isNaN(num)) {
+            return (num < 0) ? 'red' : 'blue';
+          } else {
+            return 'black';
+          }
+        }"
+        ),
+        fontWeight = JS(
+          "function(value) {
+          var num = parseFloat(value);
+          if (!isNaN(num)) {
+            return (num < 0) ? 'bold' : 'normal';
+          } else {
+            return 'normal';
+          }
+        }"
+        )
+      )
   )
+  
+  
   
   
   
