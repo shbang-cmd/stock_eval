@@ -20,7 +20,7 @@ repeat {
   # 현재 시간과 반복 횟수 출력
   cat("[", count, "회차]", format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"), ": 실행 시작\n")
   
-  setwd("c:\\easy_r\\easy_r")  # 워킹 디렉토리를 지정한다.(개별 설정이 다를 수 있음)
+  setwd("c:\\easy_r")  # 워킹 디렉토리를 지정한다.(개별 설정이 다를 수 있음)
   source("stock_eval.R")
   source("stock_eval_us.R")
   
@@ -117,7 +117,7 @@ repeat {
   end_date   <- format(max(dd$Date, na.rm = TRUE), "%Y-%m-%d")
   plot_title <- paste0("주식평가액 분석 (", start_date, " ~ ", end_date, ")  ",
                        format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분"))
-
+  
   
   df <- dd[1:2]
   
@@ -185,7 +185,7 @@ repeat {
   safety_sum = sum(s$평가금)
   safety_ratio = round(safety_sum / tail(dd, 1)[2] * 100, 2)
   
-    
+  
   # Date는 숫자형으로 변환해 회귀 (안전)
   fit <- lm(sum_left ~ as.numeric(Date), data = dd)
   slope_per_day <- coef(fit)[2]
@@ -450,54 +450,52 @@ repeat {
   #   )
   # )
   
+  
   print(
-    datatable(rt, options = list(
-      pageLength = 100,
-      columnDefs = list(
-        list(targets = c("전일대비율", "비중", "총수익률"), className = "dt-right")
+    datatable(
+      rt,
+      options = list(
+        pageLength = 100,
+        columnDefs = list(
+          list(targets = c("전일대비율", "비중", "총수익률"), className = "dt-right")
+        )
       )
-    )) %>%
+    ) %>%
       formatCurrency(
         columns = c("한화평가금", "한화매수가격", "전일한화평가금", "전일대비", "총매수금", "총수익금"),
         currency = "",
         mark = ",",
         digits = 0
       ) %>%
-      formatRound(
-        columns = c("전일대비율", "비중", "총수익률"),
-        digits = 2
-      ) %>%
-      # 🎨 조건부 서식: 음수값은 빨간색, 양수는 파란색
+      formatRound(columns = c("전일대비율", "비중", "총수익률"), digits = 2) %>%
+      
+      # 🎨 전일대비 / 총수익금: 음수=빨강, 0=검정, 양수=파랑
       formatStyle(
         columns = c("전일대비", "총수익금"),
-        color = styleInterval(0, c("red", "blue")),
-        fontWeight = styleInterval(0, c("bold", "normal"))
+        color = styleInterval(
+          c(-0.000001, 0.000001),
+          c("red", "black", "blue")
+        ),
+        fontWeight = styleInterval(
+          0,
+          c("bold", "normal")
+        )
       ) %>%
+      
+      # 🎨 전일대비율 / 총수익률: 음수=빨강, 0=회색, 양수=파랑
       formatStyle(
         columns = c("전일대비율", "총수익률"),
-        color = JS(
-          "function(value) {
-          // 문자열인 경우에도 숫자 추출
-          var num = parseFloat(value);
-          if (!isNaN(num)) {
-            return (num < 0) ? 'red' : 'blue';
-          } else {
-            return 'black';
-          }
-        }"
+        color = styleInterval(
+          c(-0.000001, 0.000001),
+          c("red", "gray", "blue")
         ),
-        fontWeight = JS(
-          "function(value) {
-          var num = parseFloat(value);
-          if (!isNaN(num)) {
-            return (num < 0) ? 'bold' : 'normal';
-          } else {
-            return 'normal';
-          }
-        }"
+        fontWeight = styleInterval(
+          0,
+          c("bold", "normal")
         )
       )
   )
+  
   
   
   
