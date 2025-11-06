@@ -1,7 +1,7 @@
 종목명,			종목번호,		보유증권사,	매수가격,		수량
 BALI,			BALI,		KB증권,		30.076,		5
 DGRO,			DGRO,		KB증권,		57.49,		3
-JEPI,			JEPI,		KB증권,		55.132,		223
+JEPI,			JEPI,		KB증권,		55.0999,		224
 SPYM,			SPYM,		KB증권,		59.0415,	758
 SCHD,			SCHD,		KB증권,		23.4869,	5990
 AAPL,			AAPL,		KB증권,		195.82,		20
@@ -31,6 +31,7 @@ ADAM,			ADAM,		NH증권,		12.57,		3
 QCOM,			QCOM,		NH증권,		87.86,		4
 WBD,			WBD,		NH증권,		24.07,		3
 BRK-B,			BRK-B,		삼성증권소수점,		508.4809,	0.107595
+
 
 
 
