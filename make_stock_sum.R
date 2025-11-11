@@ -6,7 +6,7 @@ if (length(new.pkg)) {
   install.packages(new.pkg, dependencies = TRUE)
 }
 
-# 2) 로드
+# 2) 로드        ctrl + alt + e
 library(readr); library(readxl)
 library(openxlsx); library(rvest); library(httr)
 library(dplyr); library(ggplot2); library(scales)
@@ -18,7 +18,7 @@ count <- 1  # 반복 횟수 카운터
 
 repeat {
   # 현재 시간과 반복 횟수 출력
-  cat("[", count, "회차]", format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"), ": 실행 시작\n")
+  cat("[", count, "회차]", format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"), ": 실행 시작***********************************************\n")
   
   setwd("c:\\easy_r")  # 워킹 디렉토리를 지정한다.(개별 설정이 다를 수 있음)
   source("stock_eval.R")
@@ -181,7 +181,7 @@ repeat {
   # 
   
   s <- data_ko %>% filter(str_detect(종목명, "채권|국채|금현물"))
-  # 한국 etf 중에서 채권이나 금현물이 들어간 종목을 골라낸다.
+  # 한국 etf 중에서 채권이나 금현물이 들어간 종목을 골라낸다.(안전자산은 한국주식중에서 매수한다고 가정)
   safety_sum = sum(s$평가금)
   safety_ratio = round(safety_sum / tail(dd, 1)[2] * 100, 2)
   
@@ -192,7 +192,7 @@ repeat {
   label_text <- paste0(
     "오늘평가액 : ", comma(round(tail(dd$Sum, 1), 0)), "   ",
     "총수익 : ", comma(round(tail(dd$Profit, 1), 0)), 
-    "(", round(tail(dd$Return, 1)*100, 2), "%)   ",
+    "(", round(tail(dd$Return, 1)*100, 2), "%)   \n",
     "전일대비 : ", comma(round(tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1], 0)),
     " (",
     ifelse((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) >= 0, "+", ""),
@@ -210,7 +210,8 @@ repeat {
   print(
     paste(
       "국내주식수 :", dim(data1)[1] - 1,
-      " 해외주식수 :", dim(data2)[1] - 2
+      " 해외주식수 :", dim(data2)[1] - 2,
+      " 환율 :", exchange_rate,"원/달러"
     )
   )
   
@@ -504,6 +505,8 @@ repeat {
   print(tail(dd,2))
   cat("1시간 후에 다시 실행됩니다...(중단을 원하면 Interrupt-R 빨간버튼 클릭)",
       format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"),"\n\n")
+  
+  View(rt)
   
   # 1시간 대기
   Sys.sleep(3600)
