@@ -7,7 +7,7 @@ SCHD,			SCHD,		KB증권,		23.4869,	5990
 AAPL,			AAPL,		KB증권,		195.82,		20
 QQQM,			QQQM,		KB증권,		210.4369,	13
 MSTR,			MSTR, 	KB증권소수점,		442.8229,	0.471701
-SOXX,			SOXX, 	KB증권소수점,		299.7052,	0.039005
+SOXX,			SOXX, 	KB증권소수점,		293.7546,	0.055897
 QLD,			QLD,		삼성증권,		89.15,		50
 SPYG,			SPYG,		삼성증권,		65.68,		4
 GOOG,			GOOG,		삼성증권,		135.93,		20
@@ -32,6 +32,7 @@ ADAM,			ADAM,		NH증권,		12.57,		3
 QCOM,			QCOM,		NH증권,		87.86,		4
 WBD,			WBD,		NH증권,		24.07,		3
 BRK-B,			BRK-B,		삼성증권소수점,		508.4809,	0.107595
+
 
 
 
