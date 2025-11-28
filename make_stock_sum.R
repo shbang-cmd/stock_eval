@@ -12,15 +12,15 @@ library(openxlsx); library(rvest); library(httr)
 library(dplyr); library(ggplot2); library(scales)
 library(patchwork);library(treemap);library(DT)
 
-options(scipen = 999)  # 지수표기(Scientific notation) 끄기
+setwd("c:\\easy_r\\easy_r")  # 워킹 디렉토리를 지정한다.(개별 설정이 다를 수 있음)
 
+options(scipen = 999)  # 지수표기(Scientific notation) 끄기
 count <- 1  # 반복 횟수 카운터
 
 repeat {
   # 현재 시간과 반복 횟수 출력
   cat("[", count, "회차]", format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"), ": 실행 시작***********************************************\n")
   
-  setwd("c:\\easy_r")  # 워킹 디렉토리를 지정한다.(개별 설정이 다를 수 있음)
   source("stock_eval.R")
   source("stock_eval_us.R")
   
@@ -51,19 +51,6 @@ repeat {
   sum_value <- round(sum_value + yegum, 0)
   
   result <- data.frame(Date = today, Sum = sum_value, Profit = profit_value)
-  
-  # 4) CSV append: Date가 꼭 Date형으로 유지되도록 col_types 지정
-  # if (file.exists(output_file)) {
-  #   existing_data <- read_csv(output_file,
-  #                             col_types = cols(
-  #                               Date   = col_date(format = ""),
-  #                               Sum    = col_double(),
-  #                               Profit = col_double()
-  #                             ))
-  #   updated_data <- bind_rows(existing_data, result)
-  # } else {
-  #   updated_data <- result
-  # }
   
   if (file.exists(output_file)) {
     # 기존 파일 읽기
@@ -118,8 +105,7 @@ repeat {
   plot_title <- paste0("주식평가액 분석 (", start_date, " ~ ", end_date, ")  ",
                        format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분"))
   
-  
-  df <- dd[1:2]
+    df <- dd[1:2]
   
   # 날짜형 변환
   df$Date <- as.Date(df$Date)
@@ -167,24 +153,11 @@ repeat {
   # 수치형 변환
   result$Sum <- as.numeric(result$Sum)
   result$Diff <- as.numeric(result$Diff)
-  
-  # 결과 출력
-  #print(result)
-  # t <- paste(
-  #   "1개월간 :", format(result$Diff[1], big.mark = ","), 
-  #   "  3개월간 :", format(result$Diff[2], big.mark = ","), 
-  #   "  6개월간 :", format(result$Diff[3], big.mark = ","), 
-  #   "  1년간 :", format(result$Diff[4], big.mark = ",")
-  # )
-  # 
-  # print(t)
-  # 
-  
+
   s <- data_ko %>% filter(str_detect(종목명, "채권|국채|금현물"))
   # 한국 etf 중에서 채권이나 금현물이 들어간 종목을 골라낸다.(안전자산은 한국주식중에서 매수한다고 가정)
   safety_sum = sum(s$평가금)
   safety_ratio = round(safety_sum / tail(dd, 1)[2] * 100, 2)
-  
   
   # Date는 숫자형으로 변환해 회귀 (안전)
   fit <- lm(sum_left ~ as.numeric(Date), data = dd)
@@ -216,8 +189,6 @@ repeat {
   )
   
   
-  
-  
   # 구성비율 트리맵 그리기
   dt_ko <- data_ko %>% 
     head(-1) %>% 
@@ -236,12 +207,7 @@ repeat {
     mutate(한화매수가격 = 매수가격 * exchange_rate)
   
   dt_fn <- bind_rows(dt_ko, dt_en)  # 한국주식 + 미국주식
-  
-  # hp <- sum(dt_fn$한화평가금)
-  # 
-  # dt_fn <- dt_fn %>% 
-  #   mutate(구성비율 = 한화평가금 / hp)
-  
+
   dt_fn <- dt_fn %>% 
     select(-평가금) %>% 
     arrange(desc(한화평가금))
@@ -262,9 +228,6 @@ repeat {
     inflate.labels = TRUE,                 # 작아도 표시
     align.labels = list(c("center","center")) # 중앙 정렬
   )
-  
-  
-  
   
   p <- ggplot(dd, aes(x = Date)) +
     geom_point(aes(y = sum_left, color = Profit / 10000000), size = 5) +
@@ -289,23 +252,10 @@ repeat {
              y = max(sum_left, na.rm = TRUE),
              label = label_text,
              hjust = 0, vjust = 1, size = 5, color = "black")
-  # suppressMessages(
-  #   print(p)
-  # )
+
   
   # 보조: 선형모형(날짜 → Sum)
   model <- lm(Sum / 10000000 ~ as.numeric(Date), data = dd)
-  
-  #cat("1일증가당 Sum 변화(원단위) : ", coef(model)[2] * 10000000, "\n")
-  
-  #cat("평가액 최고였던 날짜 : ")
-  #print(dd[which.max(dd$Sum), 1:3])
-  
-  #cat("평가액 최저였던 날짜 : ")
-  #print(dd[which.min(dd$Sum), 1:3])
-  
-  #cat("최대합계 - 최소합계 차이 : ")
-  #print(dd[which.max(dd$Sum), 2] - dd[which.min(dd$Sum), 2])
   
   # CAGR 함수 및 계산 (Date 형 보장)
   calc_cagr <- function(start_date, end_date, start_value, end_value) {
@@ -328,11 +278,7 @@ repeat {
   mdd_start_date<- dd$Date[mdd_start_idx]
   mdd_start_sum <- dd$Sum[mdd_start_idx]
   mdd_end_sum   <- dd$Sum[mdd_end_idx]
-  
-  #cat("MDD(최대하락폭): ", scales::percent(-mdd_value, accuracy = 0.01), "\n")
-  #cat("피크→바닥 구간 : ", format(mdd_start_date), " → ", format(mdd_end_date), "\n", sep = "")
-  #cat("평가금액    : ", scales::comma(mdd_start_sum), " → ", scales::comma(mdd_end_sum), " (원)\n", sep = "")
-  
+
   peak_label   <- paste0("피크\n", scales::comma(mdd_start_sum), "원\n(", format(mdd_start_date), ")")
   trough_label <- paste0("바닥\n", scales::comma(mdd_end_sum), "원\n(", format(mdd_end_date), ")")
   
@@ -361,17 +307,11 @@ repeat {
              vjust = 1, hjust = 0.5) +
     labs(title = "Drawdown", x = "날짜", y = "Drawdown (%)") +
     theme_minimal(base_size = 13)
-  
-  # suppressMessages(
-  #   print(p_dd)
-  # )
-  
+
   combined_plot <- p / p_dd + plot_layout(heights = c(2, 1))
   suppressMessages(
     print(combined_plot)
   )
-  
-  
   
   
   get_prev_file <- function(prefix = "output_stock_", ext = "xlsx") {
@@ -432,26 +372,7 @@ repeat {
     select(-매수가격) %>% 
     select(종목명, 보유증권사, 한화매수가격, 수량, 한화평가금, 전일한화평가금,
            전일대비, 전일대비율, 비중, 총매수금, 총수익금, 총수익률)
-  
-  # print(datatable(rt, options = list(
-  #   pageLength = 100,
-  #   columnDefs = list(
-  #     list(targets = c("전일대비율", "비중","총수익률"), className = "dt-right")  
-  #   )
-  # )) %>%
-  #   formatCurrency(
-  #     columns = c("한화평가금","한화평가금", "한화매수가격","전일한화평가금", "전일대비", "총매수금", "총수익금"),
-  #     currency = "",
-  #     mark = ",",
-  #     digits = 0
-  #   ) %>%
-  #   formatRound(
-  #     columns = c("전일대비율", "비중"),  # ⬅️ 소수점 둘째 자리까지 반올림 표시
-  #     digits = 2
-  #   )
-  # )
-  
-  
+
   print(
     datatable(
       rt,
@@ -496,11 +417,6 @@ repeat {
         )
       )
   )
-  
-  
-  
-  
-  
   
   print(tail(dd,2))
   cat("1시간 후에 다시 실행됩니다...(중단을 원하면 Interrupt-R 빨간버튼 클릭)",

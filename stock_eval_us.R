@@ -84,10 +84,6 @@ data_en <- data_en %>% arrange(desc(평가금))
 summary_row <- data.frame(종목명 = paste("(", today, "USD 합계", ")"), 종목번호 = NA, 보유증권사 = NA, 매수가격 = NA, 수량 = NA, 현재가 = NA, 평가금 = total_sum, 비중 = sum(stock_ratio), 수익금 = total_profit, 수익률 = total_profit / (total_sum - total_profit))
 data <- rbind(data_en, summary_row)
 
-
-
-#exchange_rate <- c(1, 1330.9)  # 환율 API가 잘 안되어 수동으로 입력
-
 url <- "https://finance.naver.com/marketindex/"  # 네이버 시장지표 URL
 
 # 웹페이지 가져오기
@@ -108,7 +104,7 @@ data <- rbind(data, summary_row_en)
 # 결과를 엑셀 파일로 저장
 write_xlsx(data, output_file)
 
-#cat(nrow(data)-1, "개 미국종목의 수익금 계산이 완료되었습니다. 결과는", output_file, "에 저장되었습니다.")
+cat(nrow(data)-1, "개 미국종목의 야후 시세 조회후 수익금 계산이 완료되었습니다. 결과:", output_file)
 
 data_en <- data
 View(data_en)
@@ -127,8 +123,6 @@ new_data_en <- data_en %>%
   arrange(desc(평가금))
 new_data_en
 
-
-
 # 아래 통계는 콘솔과 plots창에 표시됨
 # 증권사별 평가액
 new_data <- data %>% 
@@ -142,7 +136,6 @@ ggplot(data = new_data, aes(x = reorder(보유증권사, -sec_tot), y = sec_tot/
   #geom_text(aes(label=sec_tot/1000000/exchange_rate[-1]), vjust = -0.1) +
   geom_col()
 
-
 # 종목별 평가액
 new_data <- data %>% 
   group_by(종목명) %>% 
@@ -151,13 +144,15 @@ new_data <- data %>%
 new_data <- new_data[-1,]    # 첫번째 행 제거
 new_data <- new_data[-1,]    # 첫번째 행 제거
 new_data$rate = new_data$종목평가합산 / sum(new_data$종목평가합산)
-#print(new_data, n=30)
 
-ggplot(new_data, aes(x = reorder(종목명, -종목평가합산), y = 종목평가합산/1000000, fill=수익금합산/종목평가합산)) + 
+r <- ggplot(new_data, aes(x = reorder(종목명, -종목평가합산), y = 종목평가합산/1000000, fill=수익금합산/종목평가합산)) + 
   scale_x_discrete(guide = guide_axis(angle = 30)) +
   #labs(x = "종목", y = "종목별 합계(백만원)") +
   geom_text(aes(label= round(종목평가합산/sum(종목평가합산), 2) ), vjust = -0.1) +
   geom_col() +
   scale_fill_gradient2(low = "red", 
                        high = "blue", 
-                       midpoint = 0)
+                       midpoint = 0) +
+  labs(x = "미국주식 보유 종목별 합산", y = "보유액합계(백만원)")
+
+print(r)
