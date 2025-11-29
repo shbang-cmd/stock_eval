@@ -188,7 +188,6 @@ repeat {
     )
   )
   
-  
   # 구성비율 트리맵 그리기
   dt_ko <- data_ko %>% 
     head(-1) %>% 
@@ -305,7 +304,7 @@ repeat {
     annotate("label", x = mdd_end_date, y = (mdd_value * 100) + 5,
              label = paste0("MDD: ", scales::percent(-mdd_value, accuracy = 0.01)),
              vjust = 1, hjust = 0.5) +
-    labs(title = "Drawdown", x = "날짜", y = "Drawdown (%)") +
+    labs(title = paste0("Drawdown(", tail(dd, 1)[6] * 100, "%)"), x = "날짜", y = "Drawdown (%)") +
     theme_minimal(base_size = 13)
 
   combined_plot <- p / p_dd + plot_layout(heights = c(2, 1))
