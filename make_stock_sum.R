@@ -159,15 +159,20 @@ repeat {
   safety_sum = sum(s$평가금)
   safety_ratio = round(safety_sum / tail(dd, 1)[2] * 100, 2)
   
+  # 위험자산중에서 TQQQ의 비중(%) 계산
+  tq <- data_en %>% filter(str_detect(종목명, "TQQQ"))
+  tq_ratio = round((tq$평가금 * exchange_rate) / (tail(dd, 1)[2] - safety_sum) * 100, 2)
+  
+  
   # Date는 숫자형으로 변환해 회귀 (안전)
   fit <- lm(sum_left ~ as.numeric(Date), data = dd)
   slope_per_day <- coef(fit)[2]
   label_text <- paste0(
-    "오늘평가액 : ", comma(round(tail(dd$Sum, 1), 0)), "   ",
-    "총수익 : ", comma(round(tail(dd$Profit, 1), 0)), 
+    "오늘평가액 : ", comma(round(tail(dd$Sum, 1), 0)), "원   ",
+    "총수익 : ", comma(round(tail(dd$Profit, 1), 0)),"원" 
     "(", round(tail(dd$Return, 1)*100, 2), "%)   \n",
     "전일대비 : ", comma(round(tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1], 0)),
-    " (",
+    "원 (",
     ifelse((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) >= 0, "+", ""),
     round((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) * 100 / tail(dd$Sum, 1), 2),
     "%)" ,
@@ -177,7 +182,9 @@ repeat {
     "    6개월간 :", format(result$Diff[3], big.mark = ","), 
     "    1년간   :", format(result$Diff[4], big.mark = ","), "\n",
     "안전자산(금, 채권) 비율 : ", safety_ratio, "%(", 
-    format(safety_sum, big.mark = ","),"원)"
+    format(safety_sum, big.mark = ","),"원) -> 전체자산중 15% 유지\n",
+    "TQQQ(레버리지ETF) 비율 : ", tq_ratio, "%(", 
+    format(tq$평가금*exchange_rate, big.mark = ","),"원) -> 위험자산중 5% 유지"
   )
   #print(label_text)
   print(
