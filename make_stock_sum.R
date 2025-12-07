@@ -12,7 +12,7 @@ library(openxlsx); library(rvest); library(httr)
 library(dplyr); library(ggplot2); library(scales)
 library(patchwork);library(treemap);library(DT)
 
-setwd("c:\\easy_r\\easy_r")  # 워킹 디렉토리를 지정한다.(개별 설정이 다를 수 있음)
+setwd("c:\\easy_r")  # 워킹 디렉토리를 지정한다.(개별 설정이 다를 수 있음)
 
 options(scipen = 999)  # 지수표기(Scientific notation) 끄기
 count <- 1  # 반복 횟수 카운터
@@ -169,7 +169,7 @@ repeat {
   slope_per_day <- coef(fit)[2]
   label_text <- paste0(
     "오늘평가액 : ", comma(round(tail(dd$Sum, 1), 0)), "원   ",
-    "총수익 : ", comma(round(tail(dd$Profit, 1), 0)),"원" 
+    "총수익 : ", comma(round(tail(dd$Profit, 1), 0)),"원" ,
     "(", round(tail(dd$Return, 1)*100, 2), "%)   \n",
     "전일대비 : ", comma(round(tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1], 0)),
     "원 (",
@@ -182,9 +182,9 @@ repeat {
     "    6개월간 :", format(result$Diff[3], big.mark = ","), 
     "    1년간   :", format(result$Diff[4], big.mark = ","), "\n",
     "안전자산(금, 채권) 비율 : ", safety_ratio, "%(", 
-    format(safety_sum, big.mark = ","),"원) -> 전체자산중 15% 유지\n",
+    format(safety_sum, big.mark = ","),"원) -> 전체자산중 15% 유지(MDD ↓효과)\n",
     "TQQQ(레버리지ETF) 비율 : ", tq_ratio, "%(", 
-    format(tq$평가금*exchange_rate, big.mark = ","),"원) -> 위험자산중 5% 유지"
+    format(tq$평가금*exchange_rate, big.mark = ","),"원) -> 위험자산중 5% 유지(수익률 ↑효과)"
   )
   #print(label_text)
   print(
@@ -437,5 +437,9 @@ repeat {
   count <- count + 1
 }
 
-# Drawdown 10%이상 떨어진날 보는 코드 : 
-# dd %>% filter(abs(DD) > 0.1)
+
+# 포트폴리오 구성 방향
+# 위험자산:안전자산 = 85:15
+# 3배 레버리지 TQQQ는 위험자산의 5% 유지
+# 효과 : 특정 조건(위기·폭락)에서도 → 구조적으로 매우 강함
+#        향후 10년 예상 MDD가 약 -30%로 방어 예상
