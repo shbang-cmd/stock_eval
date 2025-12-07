@@ -105,7 +105,7 @@ repeat {
   plot_title <- paste0("주식평가액 분석 (", start_date, " ~ ", end_date, ")  ",
                        format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분"))
   
-    df <- dd[1:2]
+  df <- dd[1:2]
   
   # 날짜형 변환
   df$Date <- as.Date(df$Date)
@@ -153,7 +153,7 @@ repeat {
   # 수치형 변환
   result$Sum <- as.numeric(result$Sum)
   result$Diff <- as.numeric(result$Diff)
-
+  
   s <- data_ko %>% filter(str_detect(종목명, "채권|국채|금현물"))
   # 한국 etf 중에서 채권이나 금현물이 들어간 종목을 골라낸다.(안전자산은 한국주식중에서 매수한다고 가정)
   safety_sum = sum(s$평가금)
@@ -161,7 +161,8 @@ repeat {
   
   # 위험자산중에서 TQQQ의 비중(%) 계산
   tq <- data_en %>% filter(str_detect(종목명, "TQQQ"))
-  tq_ratio = round((tq$평가금 * exchange_rate) / (tail(dd, 1)[2] - safety_sum) * 100, 2)
+  tq_sum = sum(tq$평가금)
+  tq_ratio = round((tq_sum * exchange_rate) / (tail(dd, 1)[2] - safety_sum) * 100, 2)
   
   
   # Date는 숫자형으로 변환해 회귀 (안전)
@@ -213,7 +214,7 @@ repeat {
     mutate(한화매수가격 = 매수가격 * exchange_rate)
   
   dt_fn <- bind_rows(dt_ko, dt_en)  # 한국주식 + 미국주식
-
+  
   dt_fn <- dt_fn %>% 
     select(-평가금) %>% 
     arrange(desc(한화평가금))
@@ -258,7 +259,7 @@ repeat {
              y = max(sum_left, na.rm = TRUE),
              label = label_text,
              hjust = 0, vjust = 1, size = 5, color = "black")
-
+  
   
   # 보조: 선형모형(날짜 → Sum)
   model <- lm(Sum / 10000000 ~ as.numeric(Date), data = dd)
@@ -284,7 +285,7 @@ repeat {
   mdd_start_date<- dd$Date[mdd_start_idx]
   mdd_start_sum <- dd$Sum[mdd_start_idx]
   mdd_end_sum   <- dd$Sum[mdd_end_idx]
-
+  
   peak_label   <- paste0("피크\n", scales::comma(mdd_start_sum), "원\n(", format(mdd_start_date), ")")
   trough_label <- paste0("바닥\n", scales::comma(mdd_end_sum), "원\n(", format(mdd_end_date), ")")
   
@@ -313,7 +314,7 @@ repeat {
              vjust = 1, hjust = 0.5) +
     labs(title = paste0("Drawdown(", tail(dd, 1)[6] * 100, "%)"), x = "날짜", y = "Drawdown (%)") +
     theme_minimal(base_size = 13)
-
+  
   combined_plot <- p / p_dd + plot_layout(heights = c(2, 1))
   suppressMessages(
     print(combined_plot)
@@ -378,7 +379,7 @@ repeat {
     select(-매수가격) %>% 
     select(종목명, 보유증권사, 한화매수가격, 수량, 한화평가금, 전일한화평가금,
            전일대비, 전일대비율, 비중, 총매수금, 총수익금, 총수익률)
-
+  
   print(
     datatable(
       rt,
