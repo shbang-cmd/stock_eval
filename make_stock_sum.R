@@ -18,6 +18,17 @@ options(scipen = 999)  # 지수표기(Scientific notation) 끄기
 count <- 1  # 반복 횟수 카운터
 
 repeat {
+  
+  # 현재 시간
+  now <- as.POSIXct(Sys.time())
+  hhmm <- format(now, "%H:%M")
+  wday <- as.numeric(format(now, "%u"))  # 요일
+  week_kor <- c("일", "월", "화", "수", "목", "금", "토")
+  
+  # 실행 구간 판별
+  in_fast_range <- hhmm >= "08:40" & hhmm <= "15:30"
+  
+  
   # 현재 시간과 반복 횟수 출력
   cat("[", count, "회차]", format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"), ": 실행 시작***********************************************\n")
   
@@ -102,8 +113,14 @@ repeat {
   
   start_date <- format(min(dd$Date, na.rm = TRUE), "%Y-%m-%d")
   end_date   <- format(max(dd$Date, na.rm = TRUE), "%Y-%m-%d")
+  #plot_title <- paste0("주식평가액 분석 (", start_date, " ~ ", end_date, ")  ",
+  #                     format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분"))
   plot_title <- paste0("주식평가액 분석 (", start_date, " ~ ", end_date, ")  ",
-                       format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분"))
+                       format(Sys.time(), "%Y년 %m월 %d일"), 
+                       "(",
+                       week_kor[as.numeric(format(Sys.Date(), "%w")) + 1], 
+                       ") ",
+                       format(Sys.time(), "%H시 %M분"))
   
   df <- dd[1:2]
   
@@ -430,12 +447,21 @@ repeat {
       format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"),"\n\n")
   
   View(rt)
-  
-  # 1시간 대기
-  Sys.sleep(3600)
-  
+
   # 반복 횟수 증가
   count <- count + 1
+  
+  
+  # 다음 대기시간 설정 -------------------------------------
+  if (in_fast_range & (wday >= 1 & wday <= 5)) {  # 월 ~ 금일 때만
+    wait_min <- 10     # 거래시간대: 10분 간격
+  } else {
+    wait_min <- 60     # 비거래시간대: 1시간 간격
+  }
+  
+  #cat("다음 실행까지 대기:", wait_min, "분\n\n")
+  Sys.sleep(wait_min * 60)
+  
 }
 
 
