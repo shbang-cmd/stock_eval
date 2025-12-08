@@ -7,7 +7,7 @@ if (length(new.pkg)) {
 }
 
 # 2) 로드        ctrl + alt + e
-library(readr); library(readxl)
+library(readr)
 library(openxlsx); library(rvest); library(httr)
 library(dplyr); library(ggplot2); library(scales)
 library(patchwork);library(treemap);library(DT)
@@ -213,6 +213,124 @@ repeat {
     inflate.labels = TRUE,                 # 작아도 표시
     align.labels = list(c("center","center")) # 중앙 정렬
   )
+  # Date는 숫자형으로 변환해 회귀 (안전)
+  fit <- lm(sum_left ~ as.numeric(Date), data = dd)
+  slope_per_day <- coef(fit)[2]
+  
+  get_prev_file <- function(prefix = "output_stock_", ext = "xlsx") {
+    pattern <- paste0("^", prefix, "\\d{4}-\\d{2}-\\d{2}\\.", ext, "$")
+    files <- dir(pattern = pattern)
+    if (length(files) == 0) return(NA)
+    dates <- as.Date(sub(paste0(prefix, "(\\d{4}-\\d{2}-\\d{2})\\.", ext), "\\1", files))
+    valid_idx <- which(dates < Sys.Date())
+    if (length(valid_idx) == 0) return(NA)
+    files[which.max(dates[valid_idx])]
+  }
+  
+  # ── 전일 데이터 불러오기 ──────────────────────────────
+  data_prev_ko <- read_excel(get_prev_file("output_stock_"))
+  data_prev_en <- read_excel(get_prev_file("output_stock_us_"))
+  
+  data_prev_ko <- data_prev_ko %>%
+    head(-1) %>%
+    select(종목번호, 보유증권사, 전일한화평가금 = 평가금)
+  
+  data_prev_en <- data_prev_en %>%
+    head(-2) %>%
+    mutate(한화평가금 = 평가금 * exchange_rate) %>%
+    select(종목번호, 보유증권사, 전일한화평가금 = 한화평가금)
+  
+  data_prev_fn <- bind_rows(data_prev_ko, data_prev_en) %>%
+    arrange(desc(전일한화평가금))
+  
+  # ── 오늘 vs 전일 비교 함수 ──────────────────────────────
+  join_stock_data <- function(today_df, prev_df) {
+    today_df %>%
+      distinct(종목번호, 보유증권사, .keep_all = TRUE) %>%
+      left_join(prev_df, by = c("종목번호", "보유증권사")) %>%
+      mutate(
+        한화평가금 = trunc(한화평가금),               
+        전일한화평가금 = trunc(전일한화평가금),       
+        전일대비 = trunc(한화평가금 - 전일한화평가금), 
+        
+        # 소수점 둘째자리까지 반올림 후 고정 표시
+        전일대비율 = if_else(
+          is.na(전일한화평가금),
+          NA_character_,
+          sprintf("%.2f", round((한화평가금 - 전일한화평가금) / 전일한화평가금 * 100, 2))
+        ),
+        
+        비중 = sprintf("%.2f", round(한화평가금 / sum(한화평가금, na.rm = TRUE) * 100, 2))
+      ) %>%
+      arrange(desc(한화평가금))
+  }
+  
+  # 종합 테이블
+  rt <- join_stock_data(dt_fn, data_prev_fn) %>%
+    mutate(
+      총매수금 = 한화매수가격 * 수량,                     # 매수금(원)
+      총수익금 = 한화평가금 - 총매수금,                   # 총수익금 계산
+      총수익률 = round((총수익금 / 총매수금) * 100, 2)    # 총수익률(%) 계산
+    ) %>% 
+    select(-매수가격) %>% 
+    select(종목명, 보유증권사, 한화매수가격, 수량, 한화평가금, 전일한화평가금,
+           전일대비, 전일대비율, 비중, 총매수금, 총수익금, 총수익률)
+  
+  today_tsum = tail(dd$Sum, 1)  # 오늘 한화평가금 합계
+  
+  asset_SCHD = rt %>% filter(str_detect(종목명, "미국배당다우|SCHD")) %>% summarise(합계 = sum(한화평가금))
+  # QQQ 계열 ETF를 검색하되 TQQQ는 제외
+  asset_QQQ = rt %>% filter(str_detect(종목명, "나스닥100|QQQ"),!str_detect(종목명, "TQQQ")) %>% summarise(합계 = sum(한화평가금))
+  asset_TQQQ = rt %>% filter(str_detect(종목명, "TQQQ")) %>% summarise(합계 = sum(한화평가금))
+  asset_GLD = rt %>% filter(str_detect(종목명, "금현물")) %>% summarise(합계 = sum(한화평가금))
+  asset_BOND = rt %>% filter(str_detect(종목명, "채권|국채")) %>% summarise(합계 = sum(한화평가금))
+  # 위의 것들에 속하지 않으면 SPY 및 기타주식(asset_SPY_ETC 변수)으로 간주하자
+  asset_SPY_ETC = (rt %>% summarise(합계 = sum(한화평가금))) - asset_SCHD - asset_QQQ - asset_GLD - asset_BOND  
+  asset_SCHD_ratio = asset_SCHD / today_tsum * 100
+  asset_QQQ_ratio = asset_QQQ / today_tsum * 100
+  asset_TQQQ_ratio = asset_TQQQ / today_tsum * 100
+  asset_GLD_ratio = asset_GLD / today_tsum * 100
+  asset_BOND_ratio = asset_BOND / today_tsum * 100
+  asset_SPY_ETC_ratio = asset_SPY_ETC / today_tsum * 100
+  
+  
+  label_text <- paste0(
+    "오늘평가액 : ", comma(round(today_tsum, 0)), "원   ",
+    "총수익 : ", comma(round(tail(dd$Profit, 1), 0)),"원" ,
+    "(", round(tail(dd$Return, 1)*100, 2), "%)   \n",
+    "전일대비 : ", comma(round(tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1], 0)),
+    "원 (",
+    ifelse((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) >= 0, "+", ""),
+    round((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) * 100 / tail(dd$Sum, 1), 2),
+    "%)" ,
+    "  1일 평균 증가액 : ", comma(round(slope_per_day * 10000000, 0)), "(원/일)   \n",
+    "(증분)1개월간 :", format(result$Diff[1], big.mark = ","), 
+    "    3개월간 :", format(result$Diff[2], big.mark = ","), 
+    "    6개월간 :", format(result$Diff[3], big.mark = ","), 
+    "    1년간   :", format(result$Diff[4], big.mark = ","), "\n",
+    "SPY등:SCHD:QQQ:TQQQ:금:채권(최종목표%) = 40  : 20  :15  : 10  : 10  : 5\n",
+    "SPY등:SCHD:QQQ:TQQQ:금:채권(현재비율%) = ", 
+    round(asset_SPY_ETC_ratio, 1)," : ",
+    round(asset_SCHD_ratio, 1)," : ",
+    round(asset_QQQ_ratio, 1)," : ",
+    round(asset_TQQQ_ratio, 1)," : ",
+    round(asset_GLD_ratio, 1)," : ",
+    round(asset_BOND_ratio, 1),"\n",
+    "SPY등:SCHD:QQQ:TQQQ:금:채권(목표억원  ) = ", 
+    round(today_tsum *  .4  / 100000000, 1)," : ",
+    round(today_tsum *  .2  / 100000000, 1)," : ",
+    round(today_tsum *  .15 / 100000000, 1)," : ",
+    round(today_tsum *  .1  / 100000000, 1)," : ",
+    round(today_tsum *  .1  / 100000000, 1)," : ",
+    round(today_tsum *  .05 / 100000000, 1), "\n",
+    "SPY등:SCHD:QQQ:TQQQ:금:채권(현재억원  ) = ", 
+    round(asset_SPY_ETC / 100000000, 1)," : ",
+    round(asset_SCHD / 100000000, 1)," : ",
+    round(asset_QQQ / 100000000, 1)," : ",
+    round(asset_TQQQ / 100000000, 1)," : ",
+    round(asset_GLD / 100000000, 1)," : ",
+    round(asset_BOND / 100000000, 1)
+  )
   
   p <- ggplot(dd, aes(x = Date)) +
     geom_point(aes(y = sum_left, color = Profit / 10000000), size = 5) +
@@ -299,125 +417,10 @@ repeat {
   )
   
   
-  get_prev_file <- function(prefix = "output_stock_", ext = "xlsx") {
-    pattern <- paste0("^", prefix, "\\d{4}-\\d{2}-\\d{2}\\.", ext, "$")
-    files <- dir(pattern = pattern)
-    if (length(files) == 0) return(NA)
-    dates <- as.Date(sub(paste0(prefix, "(\\d{4}-\\d{2}-\\d{2})\\.", ext), "\\1", files))
-    valid_idx <- which(dates < Sys.Date())
-    if (length(valid_idx) == 0) return(NA)
-    files[which.max(dates[valid_idx])]
-  }
-  
-  # ── 전일 데이터 불러오기 ──────────────────────────────
-  data_prev_ko <- read_excel(get_prev_file("output_stock_"))
-  data_prev_en <- read_excel(get_prev_file("output_stock_us_"))
-  
-  data_prev_ko <- data_prev_ko %>%
-    head(-1) %>%
-    select(종목번호, 보유증권사, 전일한화평가금 = 평가금)
-  
-  data_prev_en <- data_prev_en %>%
-    head(-2) %>%
-    mutate(한화평가금 = 평가금 * exchange_rate) %>%
-    select(종목번호, 보유증권사, 전일한화평가금 = 한화평가금)
-  
-  data_prev_fn <- bind_rows(data_prev_ko, data_prev_en) %>%
-    arrange(desc(전일한화평가금))
-  
-  # ── 오늘 vs 전일 비교 함수 ──────────────────────────────
-  join_stock_data <- function(today_df, prev_df) {
-    today_df %>%
-      distinct(종목번호, 보유증권사, .keep_all = TRUE) %>%
-      left_join(prev_df, by = c("종목번호", "보유증권사")) %>%
-      mutate(
-        한화평가금 = trunc(한화평가금),               
-        전일한화평가금 = trunc(전일한화평가금),       
-        전일대비 = trunc(한화평가금 - 전일한화평가금), 
-        
-        # 소수점 둘째자리까지 반올림 후 고정 표시
-        전일대비율 = if_else(
-          is.na(전일한화평가금),
-          NA_character_,
-          sprintf("%.2f", round((한화평가금 - 전일한화평가금) / 전일한화평가금 * 100, 2))
-        ),
-        
-        비중 = sprintf("%.2f", round(한화평가금 / sum(한화평가금, na.rm = TRUE) * 100, 2))
-      ) %>%
-      arrange(desc(한화평가금))
-  }
-  
-  # 종합 테이블
-  rt <- join_stock_data(dt_fn, data_prev_fn) %>%
-    mutate(
-      총매수금 = 한화매수가격 * 수량,                     # 매수금(원)
-      총수익금 = 한화평가금 - 총매수금,                   # 총수익금 계산
-      총수익률 = round((총수익금 / 총매수금) * 100, 2)    # 총수익률(%) 계산
-    ) %>% 
-    select(-매수가격) %>% 
-    select(종목명, 보유증권사, 한화매수가격, 수량, 한화평가금, 전일한화평가금,
-           전일대비, 전일대비율, 비중, 총매수금, 총수익금, 총수익률)
-  
-  today_tsum = tail(dd$Sum, 1)  # 오늘 한화평가금 합계
-  
-  asset_SCHD = rt %>% filter(str_detect(종목명, "미국배당다우|SCHD")) %>% summarise(합계 = sum(한화평가금))
-  # QQQ 계열 ETF를 검색하되 TQQQ는 제외
-  asset_QQQ = rt %>% filter(str_detect(종목명, "나스닥100|QQQ"),!str_detect(종목명, "TQQQ")) %>% summarise(합계 = sum(한화평가금))
-  asset_TQQQ = rt %>% filter(str_detect(종목명, "TQQQ")) %>% summarise(합계 = sum(한화평가금))
-  asset_GLD = rt %>% filter(str_detect(종목명, "금현물")) %>% summarise(합계 = sum(한화평가금))
-  asset_BOND = rt %>% filter(str_detect(종목명, "채권|국채")) %>% summarise(합계 = sum(한화평가금))
-  # 위의 것들에 속하지 않으면 SPY 및 기타주식(asset_SPY_ETC 변수)으로 간주하자
-  asset_SPY_ETC = (rt %>% summarise(합계 = sum(한화평가금))) - asset_SCHD - asset_QQQ - asset_GLD - asset_BOND  
-  asset_SCHD_ratio = asset_SCHD / today_tsum * 100
-  asset_QQQ_ratio = asset_QQQ / today_tsum * 100
-  asset_TQQQ_ratio = asset_TQQQ / today_tsum * 100
-  asset_GLD_ratio = asset_GLD / today_tsum * 100
-  asset_BOND_ratio = asset_BOND / today_tsum * 100
-  asset_SPY_ETC_ratio = asset_SPY_ETC / today_tsum * 100
   
   
   
-  # Date는 숫자형으로 변환해 회귀 (안전)
-  fit <- lm(sum_left ~ as.numeric(Date), data = dd)
-  slope_per_day <- coef(fit)[2]
   
-  label_text <- paste0(
-    "오늘평가액 : ", comma(round(today_tsum, 0)), "원   ",
-    "총수익 : ", comma(round(tail(dd$Profit, 1), 0)),"원" ,
-    "(", round(tail(dd$Return, 1)*100, 2), "%)   \n",
-    "전일대비 : ", comma(round(tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1], 0)),
-    "원 (",
-    ifelse((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) >= 0, "+", ""),
-    round((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) * 100 / tail(dd$Sum, 1), 2),
-    "%)" ,
-    "  1일 평균 증가액 : ", comma(round(slope_per_day * 10000000, 0)), "(원/일)   \n",
-    "(증분)1개월간 :", format(result$Diff[1], big.mark = ","), 
-    "    3개월간 :", format(result$Diff[2], big.mark = ","), 
-    "    6개월간 :", format(result$Diff[3], big.mark = ","), 
-    "    1년간   :", format(result$Diff[4], big.mark = ","), "\n",
-    "SPY등:SCHD:QQQ:TQQQ:금:채권(최종목표%) = 40  : 20  :15  : 10  : 10  : 5\n",
-    "SPY등:SCHD:QQQ:TQQQ:금:채권(현재비율%) = ", 
-    round(asset_SPY_ETC_ratio, 1)," : ",
-    round(asset_SCHD_ratio, 1)," : ",
-    round(asset_QQQ_ratio, 1)," : ",
-    round(asset_TQQQ_ratio, 1)," : ",
-    round(asset_GLD_ratio, 1)," : ",
-    round(asset_BOND_ratio, 1),"\n",
-    "SPY등:SCHD:QQQ:TQQQ:금:채권(목표억원  ) = ", 
-    round(today_tsum *  .4  / 100000000, 1)," : ",
-    round(today_tsum *  .2  / 100000000, 1)," : ",
-    round(today_tsum *  .15 / 100000000, 1)," : ",
-    round(today_tsum *  .1  / 100000000, 1)," : ",
-    round(today_tsum *  .1  / 100000000, 1)," : ",
-    round(today_tsum *  .05 / 100000000, 1), "\n",
-    "SPY등:SCHD:QQQ:TQQQ:금:채권(현재억원  ) = ", 
-    round(asset_SPY_ETC / 100000000, 1)," : ",
-    round(asset_SCHD / 100000000, 1)," : ",
-    round(asset_QQQ / 100000000, 1)," : ",
-    round(asset_TQQQ / 100000000, 1)," : ",
-    round(asset_GLD / 100000000, 1)," : ",
-    round(asset_BOND / 100000000, 1)
-  )
   #print(label_text)
   print(
     paste(
@@ -478,7 +481,7 @@ repeat {
       format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"),"\n\n")
   
   View(rt)
-
+  
   # 반복 횟수 증가
   count <- count + 1
   
@@ -490,7 +493,6 @@ repeat {
     wait_min <- 60     # 비거래시간대: 1시간 간격
   }
   
-  #cat("다음 실행까지 대기:", wait_min, "분\n\n")
   Sys.sleep(wait_min * 60)
   
 }
