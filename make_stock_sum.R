@@ -1,13 +1,15 @@
 # 1) 필요한 패키지 전부 설치
+
 pkg <- c("openxlsx", "rvest", "httr", "patchwork", "ggplot2",
          "readr", "readxl", "dplyr", "scales", "treemap", "DT")
 new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
 if (length(new.pkg)) {
   install.packages(new.pkg, dependencies = TRUE)
 }
+# 최신 패키지 설치 명령 : update.packages(ask = FALSE, checkBuilt = TRUE)
 
 # 2) 로드        ctrl + alt + e
-library(readr)
+library(readr);library(readxl)
 library(openxlsx); library(rvest); library(httr)
 library(dplyr); library(ggplot2); library(scales)
 library(patchwork);library(treemap);library(DT)
