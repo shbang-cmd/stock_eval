@@ -361,11 +361,13 @@ repeat {
   today_tsum = tail(dd$Sum, 1)  # 오늘 한화평가금 합계
   
   asset_SCHD = rt %>% filter(str_detect(종목명, "미국배당다우|SCHD")) %>% summarise(합계 = sum(한화평가금))
-  asset_QQQ = rt %>% filter(str_detect(종목명, "나스닥100|QQQ")) %>% summarise(합계 = sum(한화평가금))
+  # QQQ 계열 ETF를 검색하되 TQQQ는 제외
+  asset_QQQ = rt %>% filter(str_detect(종목명, "나스닥100|QQQ"),!str_detect(종목명, "TQQQ")) %>% summarise(합계 = sum(한화평가금))
   asset_TQQQ = rt %>% filter(str_detect(종목명, "TQQQ")) %>% summarise(합계 = sum(한화평가금))
   asset_GLD = rt %>% filter(str_detect(종목명, "금현물")) %>% summarise(합계 = sum(한화평가금))
   asset_BOND = rt %>% filter(str_detect(종목명, "채권|국채")) %>% summarise(합계 = sum(한화평가금))
-  asset_SPY_ETC = (rt %>% summarise(합계 = sum(한화평가금))) - asset_SCHD - asset_QQQ - asset_GLD - asset_BOND
+  # 위의 것들에 속하지 않으면 SPY 및 기타주식(asset_SPY_ETC 변수)으로 간주하자
+  asset_SPY_ETC = (rt %>% summarise(합계 = sum(한화평가금))) - asset_SCHD - asset_QQQ - asset_GLD - asset_BOND  
   asset_SCHD_ratio = asset_SCHD / today_tsum * 100
   asset_QQQ_ratio = asset_QQQ / today_tsum * 100
   asset_TQQQ_ratio = asset_TQQQ / today_tsum * 100
