@@ -171,47 +171,8 @@ repeat {
   result$Sum <- as.numeric(result$Sum)
   result$Diff <- as.numeric(result$Diff)
   
-  s <- data_ko %>% filter(str_detect(종목명, "채권|국채|금현물"))
-  # 한국 etf 중에서 채권이나 금현물이 들어간 종목을 골라낸다.(안전자산은 한국주식중에서 매수한다고 가정)
-  safety_sum = sum(s$평가금)
-  safety_ratio = round(safety_sum / tail(dd, 1)[2] * 100, 2)
-  
-  # 위험자산중에서 TQQQ의 비중(%) 계산
-  tq <- data_en %>% filter(str_detect(종목명, "TQQQ"))
-  tq_sum = sum(tq$평가금)
-  tq_ratio = round((tq_sum * exchange_rate) / (tail(dd, 1)[2] - safety_sum) * 100, 2)
   
   
-  # Date는 숫자형으로 변환해 회귀 (안전)
-  fit <- lm(sum_left ~ as.numeric(Date), data = dd)
-  slope_per_day <- coef(fit)[2]
-  label_text <- paste0(
-    "오늘평가액 : ", comma(round(tail(dd$Sum, 1), 0)), "원   ",
-    "총수익 : ", comma(round(tail(dd$Profit, 1), 0)),"원" ,
-    "(", round(tail(dd$Return, 1)*100, 2), "%)   \n",
-    "전일대비 : ", comma(round(tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1], 0)),
-    "원 (",
-    ifelse((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) >= 0, "+", ""),
-    round((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) * 100 / tail(dd$Sum, 1), 2),
-    "%)" ,
-    "  1일 평균 증가액 : ", comma(round(slope_per_day * 10000000, 0)), "(원/일)   \n",
-    "(증분)1개월간 :", format(result$Diff[1], big.mark = ","), 
-    "    3개월간 :", format(result$Diff[2], big.mark = ","), 
-    "    6개월간 :", format(result$Diff[3], big.mark = ","), 
-    "    1년간   :", format(result$Diff[4], big.mark = ","), "\n",
-    "안전자산(금, 채권) 비율 : ", safety_ratio, "%(", 
-    format(safety_sum, big.mark = ","),"원) -> 전체자산중 15% 유지(MDD ↓효과)\n",
-    "TQQQ(레버리지ETF) 비율 : ", tq_ratio, "%(", 
-    format(tq$평가금*exchange_rate, big.mark = ","),"원) -> 위험자산중 5% 유지(수익률 ↑효과)"
-  )
-  #print(label_text)
-  print(
-    paste(
-      "국내주식수 :", dim(data1)[1] - 1,
-      " 해외주식수 :", dim(data2)[1] - 2,
-      " 환율 :", exchange_rate,"원/달러"
-    )
-  )
   
   # 구성비율 트리맵 그리기
   dt_ko <- data_ko %>% 
@@ -386,16 +347,84 @@ repeat {
       arrange(desc(한화평가금))
   }
   
-  # ── 실행 ──────────────────────────────
+  # 종합 테이블
   rt <- join_stock_data(dt_fn, data_prev_fn) %>%
     mutate(
-      총매수금 = 한화매수가격 * 수량,                          # 매수금(원)
+      총매수금 = 한화매수가격 * 수량,                     # 매수금(원)
       총수익금 = 한화평가금 - 총매수금,                   # 총수익금 계산
       총수익률 = round((총수익금 / 총매수금) * 100, 2)    # 총수익률(%) 계산
     ) %>% 
     select(-매수가격) %>% 
     select(종목명, 보유증권사, 한화매수가격, 수량, 한화평가금, 전일한화평가금,
            전일대비, 전일대비율, 비중, 총매수금, 총수익금, 총수익률)
+  
+  today_tsum = tail(dd$Sum, 1)  # 오늘 한화평가금 합계
+  
+  asset_SCHD = rt %>% filter(str_detect(종목명, "미국배당다우|SCHD")) %>% summarise(합계 = sum(한화평가금))
+  asset_QQQ = rt %>% filter(str_detect(종목명, "나스닥100|QQQ")) %>% summarise(합계 = sum(한화평가금))
+  asset_TQQQ = rt %>% filter(str_detect(종목명, "TQQQ")) %>% summarise(합계 = sum(한화평가금))
+  asset_GLD = rt %>% filter(str_detect(종목명, "금현물")) %>% summarise(합계 = sum(한화평가금))
+  asset_BOND = rt %>% filter(str_detect(종목명, "채권|국채")) %>% summarise(합계 = sum(한화평가금))
+  asset_SPY_ETC = (rt %>% summarise(합계 = sum(한화평가금))) - asset_SCHD - asset_QQQ - asset_GLD - asset_BOND
+  asset_SCHD_ratio = asset_SCHD / today_tsum * 100
+  asset_QQQ_ratio = asset_QQQ / today_tsum * 100
+  asset_TQQQ_ratio = asset_TQQQ / today_tsum * 100
+  asset_GLD_ratio = asset_GLD / today_tsum * 100
+  asset_BOND_ratio = asset_BOND / today_tsum * 100
+  asset_SPY_ETC_ratio = asset_SPY_ETC / today_tsum * 100
+  
+  
+  
+  # Date는 숫자형으로 변환해 회귀 (안전)
+  fit <- lm(sum_left ~ as.numeric(Date), data = dd)
+  slope_per_day <- coef(fit)[2]
+  
+  label_text <- paste0(
+    "오늘평가액 : ", comma(round(today_tsum, 0)), "원   ",
+    "총수익 : ", comma(round(tail(dd$Profit, 1), 0)),"원" ,
+    "(", round(tail(dd$Return, 1)*100, 2), "%)   \n",
+    "전일대비 : ", comma(round(tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1], 0)),
+    "원 (",
+    ifelse((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) >= 0, "+", ""),
+    round((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) * 100 / tail(dd$Sum, 1), 2),
+    "%)" ,
+    "  1일 평균 증가액 : ", comma(round(slope_per_day * 10000000, 0)), "(원/일)   \n",
+    "(증분)1개월간 :", format(result$Diff[1], big.mark = ","), 
+    "    3개월간 :", format(result$Diff[2], big.mark = ","), 
+    "    6개월간 :", format(result$Diff[3], big.mark = ","), 
+    "    1년간   :", format(result$Diff[4], big.mark = ","), "\n",
+    "SPY등:SCHD:QQQ:TQQQ:금:채권(최종목표%) = 40  : 20  :15  : 10  : 10  : 5\n",
+    "SPY등:SCHD:QQQ:TQQQ:금:채권(현재비율%) = ", 
+    round(asset_SPY_ETC_ratio, 1)," : ",
+    round(asset_SCHD_ratio, 1)," : ",
+    round(asset_QQQ_ratio, 1)," : ",
+    round(asset_TQQQ_ratio, 1)," : ",
+    round(asset_GLD_ratio, 1)," : ",
+    round(asset_BOND_ratio, 1),"\n",
+    "SPY등:SCHD:QQQ:TQQQ:금:채권(목표억원  ) = ", 
+    round(today_tsum *  .4  / 100000000, 1)," : ",
+    round(today_tsum *  .2  / 100000000, 1)," : ",
+    round(today_tsum *  .15 / 100000000, 1)," : ",
+    round(today_tsum *  .1  / 100000000, 1)," : ",
+    round(today_tsum *  .1  / 100000000, 1)," : ",
+    round(today_tsum *  .05 / 100000000, 1), "\n",
+    "SPY등:SCHD:QQQ:TQQQ:금:채권(현재억원  ) = ", 
+    round(asset_SPY_ETC / 100000000, 1)," : ",
+    round(asset_SCHD / 100000000, 1)," : ",
+    round(asset_QQQ / 100000000, 1)," : ",
+    round(asset_TQQQ / 100000000, 1)," : ",
+    round(asset_GLD / 100000000, 1)," : ",
+    round(asset_BOND / 100000000, 1)
+  )
+  #print(label_text)
+  print(
+    paste(
+      "국내주식수 :", dim(data1)[1] - 1,
+      " 해외주식수 :", dim(data2)[1] - 2,
+      " 환율 :", exchange_rate,"원/달러"
+    )
+  )
+  
   
   print(
     datatable(
@@ -443,7 +472,7 @@ repeat {
   )
   
   print(tail(dd,2))
-  cat("1시간 후에 다시 실행됩니다...(중단을 원하면 Interrupt-R 빨간버튼 클릭)",
+  cat("장중 10분 그이외는 1시간 후에 다시 실행됨(중단을 원하면 Interrupt-R 빨간버튼 클릭)",
       format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"),"\n\n")
   
   View(rt)
@@ -465,8 +494,11 @@ repeat {
 }
 
 
-# 포트폴리오 구성 방향
-# 위험자산:안전자산 = 85:15
-# 3배 레버리지 TQQQ는 위험자산의 5% 유지
-# 효과 : 특정 조건(위기·폭락)에서도 → 구조적으로 매우 강함
-#        향후 10년 예상 MDD가 약 -30%로 방어 예상
+# 연 1회 리밸런싱 (가장 추천)
+# 매년 1월 1일:
+#  SPY 40
+#  QQQ 20
+#  SCHD 15
+#  TQQQ 10
+#  금 10
+#  채권 5
