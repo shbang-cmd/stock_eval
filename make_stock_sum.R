@@ -346,7 +346,7 @@ repeat {
       name = "보유합계(천만원)",
       sec.axis = sec_axis(~ (. - b) / a, name = "수익률(%)")
     ) +
-    labs(title = plot_title, x = "날짜(월)", color = "수익") +
+    labs(title = plot_title, x = paste0(exchange_rate, "원/달러"), color = "수익") +
     theme_minimal(base_size = 13) +
     theme(axis.title.y.right = element_text(color = "green"),
           legend.position = "right",
@@ -397,8 +397,8 @@ repeat {
   
   p_dd <- ggplot(dd, aes(x = Date, y = DD * 100)) +
     geom_hline(yintercept = 0) +
-    geom_area(alpha = 0.25) +
-    geom_line() +
+    geom_area(alpha = 0) +
+    geom_line(linewidth = 2) +
     geom_vline(xintercept = c(mdd_start_date, mdd_end_date), linetype = "dashed") +
     geom_point(data = dd_points, aes(x = Date, y = DDpct), size = 3, color = "firebrick") +
     annotate("label", x = mdd_start_date, y = y_peak_label,
