@@ -287,7 +287,7 @@ repeat {
   asset_GLD = rt %>% filter(str_detect(종목명, "금현물")) %>% summarise(합계 = sum(한화평가금))
   asset_BOND = rt %>% filter(str_detect(종목명, "채권|국채")) %>% summarise(합계 = sum(한화평가금))
   # 위의 것들에 속하지 않으면 SPY 및 기타주식(asset_SPY_ETC 변수)으로 간주하자
-  asset_SPY_ETC = (rt %>% summarise(합계 = sum(한화평가금))) - asset_SCHD - asset_QQQ - asset_GLD - asset_BOND  
+  asset_SPY_ETC = today_tsum - asset_SCHD - asset_QQQ - asset_TQQQ - asset_GLD - asset_BOND  
   asset_SCHD_ratio = asset_SCHD / today_tsum * 100
   asset_QQQ_ratio = asset_QQQ / today_tsum * 100
   asset_TQQQ_ratio = asset_TQQQ / today_tsum * 100
@@ -311,6 +311,7 @@ repeat {
     "    6개월간 :", format(result$Diff[3], big.mark = ","), 
     "    1년간   :", format(result$Diff[4], big.mark = ","), "\n",
     "SPY등:SCHD:QQQ:TQQQ:금:채권(최종목표%) = 40.0 : 20.0 : 15.0 : 10.0 : 10.0 : 5.0\n",
+    # "SPY등:SCHD:QQQ:TQQQ:금:채권(최종목표%) = 32.0 : 18.0 : 15.0 :  8.0 : 17.0 : 10.0\n",
     "SPY등:SCHD:QQQ:TQQQ:금:채권(현재비율%) = ", 
     format(round(asset_SPY_ETC_ratio, 1), nsmall = 1)," : ",
     format(round(asset_SCHD_ratio,    1), nsmall = 1)," : ",
@@ -318,13 +319,27 @@ repeat {
     format(round(asset_TQQQ_ratio,    1), nsmall = 1)," : ",
     format(round(asset_GLD_ratio,     1), nsmall = 1)," : ",
     format(round(asset_BOND_ratio,    1), nsmall = 1),"\n",
-    "SPY등:SCHD:QQQ:TQQQ:금:채권(목표억원  ) = ", 
+
+    # 수익최대화 버전     
+    "SPY등:SCHD:QQQ:TQQQ:금:채권(목표억원  ) = ",
     format(round(today_tsum *  .4  / 100000000, 1), nsmall = 1)," : ",
     format(round(today_tsum *  .2  / 100000000, 1), nsmall = 1)," : ",
     format(round(today_tsum *  .15 / 100000000, 1), nsmall = 1)," : ",
     format(round(today_tsum *  .1  / 100000000, 1), nsmall = 1)," : ",
     format(round(today_tsum *  .1  / 100000000, 1), nsmall = 1)," : ",
     format(round(today_tsum *  .05 / 100000000, 1), nsmall = 1), "\n",
+    
+    # sharpe 최대화 버전 SPY 32 / QQQ 18 / SCHD 15 / TQQQ 8 / 금 17 / 채권 10
+    # "SPY등:SCHD:QQQ:TQQQ:금:채권(목표억원  ) = ", 
+    # format(round(today_tsum *  .32  / 100000000, 1), nsmall = 1)," : ",
+    # format(round(today_tsum *  .18  / 100000000, 1), nsmall = 1)," : ",
+    # format(round(today_tsum *  .15 / 100000000, 1), nsmall = 1)," : ",
+    # format(round(today_tsum *  .08  / 100000000, 1), nsmall = 1)," : ",
+    # format(round(today_tsum *  .17  / 100000000, 1), nsmall = 1)," : ",
+    # format(round(today_tsum *  .10 / 100000000, 1), nsmall = 1), "\n",
+    # 
+    
+    
     "SPY등:SCHD:QQQ:TQQQ:금:채권(현재억원  ) = ", 
     format(round(asset_SPY_ETC / 100000000, 1), nsmall = 1)," : ",
     format(round(asset_SCHD    / 100000000, 1), nsmall = 1)," : ",
