@@ -117,7 +117,7 @@ repeat {
   end_date   <- format(max(dd$Date, na.rm = TRUE), "%Y-%m-%d")
   #plot_title <- paste0("주식평가액 분석 (", start_date, " ~ ", end_date, ")  ",
   #                     format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분"))
-  plot_title <- paste0("주식평가액 분석 (", start_date, " ~ ", end_date, ")  ",
+  plot_title <- paste0("JS 펀드 주식평가액 분석 (", start_date, " ~ ", end_date, ")  ",
                        format(Sys.time(), "%Y년 %m월 %d일"), 
                        "(",
                        week_kor[as.numeric(format(Sys.Date(), "%w")) + 1], 
@@ -172,8 +172,6 @@ repeat {
   # 수치형 변환
   result$Sum <- as.numeric(result$Sum)
   result$Diff <- as.numeric(result$Diff)
-  
-  
   
   
   # 구성비율 트리맵 그리기
@@ -319,7 +317,7 @@ repeat {
     format(round(asset_TQQQ_ratio,    1), nsmall = 1)," : ",
     format(round(asset_GLD_ratio,     1), nsmall = 1)," : ",
     format(round(asset_BOND_ratio,    1), nsmall = 1),"\n",
-
+    
     # 수익최대화 버전     
     "SPY등:SCHD:QQQ:TQQQ:금:채권(목표억원  ) = ",
     format(round(today_tsum *  .4  / 100000000, 1), nsmall = 1)," : ",
@@ -337,7 +335,6 @@ repeat {
     # format(round(today_tsum *  .08  / 100000000, 1), nsmall = 1)," : ",
     # format(round(today_tsum *  .17  / 100000000, 1), nsmall = 1)," : ",
     # format(round(today_tsum *  .10 / 100000000, 1), nsmall = 1), "\n",
-    # 
     
     
     "SPY등:SCHD:QQQ:TQQQ:금:채권(현재억원  ) = ", 
@@ -434,10 +431,6 @@ repeat {
   )
   
   
-  
-  
-  
-  
   #print(label_text)
   print(
     paste(
@@ -515,7 +508,7 @@ repeat {
 }
 
 
-# 연 1회 리밸런싱 (가장 추천)
+# 연 1회 리밸런싱(가장 추천), 매월 적립매수시 비율 유지(자동으로 쌀 때 더사게됨)
 # 매년 1월 1일:
 #  SPY 40
 #  QQQ 20
@@ -523,3 +516,9 @@ repeat {
 #  TQQQ 10
 #  금 10
 #  채권 5
+
+# 주 
+# 1. KRX 금매수 시 ACE KRX 금현물로 변환하여 입력(KRX 금시세 조회가 여려움)
+# 2. 보유증권사 구분:  xx증권 : 국내일반계좌, xx증권(미) : 미국주식
+#                      xx증권IRP : IPR계좌, xx증권ISA : ISA계좌
+# 3. 미국주식은 매수 시점의 환율 기록이 안되어 환차손익의 반영이 안됨
