@@ -113,15 +113,23 @@ repeat {
   #  - 평가금(Sum) 시계열 → 일별 수익률 → 연환산 성과/Sharpe/MDD 계산
   # ========================================================================
   
-  # 1) 날짜순 정렬 (혹시 순서가 꼬였을 경우를 대비)
-  dd <- dd %>% arrange(Date)
+  dd_daily <- dd %>%
+    group_by(Date) %>%
+    summarise(Sum = last(Sum), .groups="drop") %>%
+    arrange(Date)
   
-  # 2) 평가금 시계열을 xts로 변환
-  sum_xts <- xts(dd$Sum, order.by = dd$Date)
-  
-  # 3) 기간별(일별) 수익률 계산
-  ret_xts <- PerformanceAnalytics::Return.calculate(sum_xts, method = "discrete")
-  ret_xts <- ret_xts[-1, , drop = FALSE]  # 첫 행 NA 제거
+  sum_xts <- xts(dd_daily$Sum, order.by = dd_daily$Date)
+  ret_xts <- Return.calculate(sum_xts, method="discrete")[-1]
+  # 
+  # # 1) 날짜순 정렬 (혹시 순서가 꼬였을 경우를 대비)
+  # dd <- dd %>% arrange(Date)
+  # 
+  # # 2) 평가금 시계열을 xts로 변환
+  # sum_xts <- xts(dd$Sum, order.by = dd$Date)
+  # 
+  # # 3) 기간별(일별) 수익률 계산
+  # ret_xts <- PerformanceAnalytics::Return.calculate(sum_xts, method = "discrete")
+  # ret_xts <- ret_xts[-1, , drop = FALSE]  # 첫 행 NA 제거
   colnames(ret_xts) <- "JS_Fund"
   
   # 4) 성과 요약 출력
