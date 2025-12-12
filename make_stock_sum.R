@@ -6,18 +6,18 @@
 
 # 1) 필요한 패키지 전부 설치 ------------------------------------------
 pkg <- c("openxlsx", "rvest", "httr", "patchwork", "ggplot2",
-         "readr", "readxl", "dplyr", "scales", "treemap", "DT", "stringr")
+         "readr", "readxl", "dplyr", "scales", "treemap", "DT", "stringr", "PerformanceAnalytics")
 new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
 if (length(new.pkg)) {
   install.packages(new.pkg, dependencies = TRUE)
 }
 
-# 2) 로드 --------------------------------------------------------------
+# 2) 로드 --------- ctrl + alt + e
 library(readr);   library(readxl)
 library(openxlsx); library(rvest); library(httr)
 library(dplyr);   library(ggplot2); library(scales)
 library(patchwork); library(treemap); library(DT)
-library(stringr)
+library(stringr); library(PerformanceAnalytics)
 
 setwd("c:\\easy_r")
 
@@ -105,6 +105,47 @@ repeat {
   
   dd <- dd %>% mutate(Return = Profit / (Sum - Profit))
   
+  
+  
+  
+  # ========================================================================
+  # === PerformanceAnalytics 블록 시작 =====================================
+  #  - 평가금(Sum) 시계열 → 일별 수익률 → 연환산 성과/Sharpe/MDD 계산
+  # ========================================================================
+  
+  # 1) 날짜순 정렬 (혹시 순서가 꼬였을 경우를 대비)
+  dd <- dd %>% arrange(Date)
+  
+  # 2) 평가금 시계열을 xts로 변환
+  sum_xts <- xts(dd$Sum, order.by = dd$Date)
+  
+  # 3) 기간별(일별) 수익률 계산
+  ret_xts <- PerformanceAnalytics::Return.calculate(sum_xts, method = "discrete")
+  ret_xts <- ret_xts[-1, , drop = FALSE]  # 첫 행 NA 제거
+  colnames(ret_xts) <- "JS_Fund"
+  
+  # 4) 성과 요약 출력
+  cat("\n=========== PerformanceAnalytics 성과 요약 ===========\n")
+  print(table.AnnualizedReturns(ret_xts))
+  cat("\nMax Drawdown:\n")
+  print(maxDrawdown(ret_xts))
+  cat("Sharpe(연환산, Rf=0):\n")
+  print(SharpeRatio.annualized(ret_xts, Rf = 0))
+  cat("======================================================\n\n")
+  
+  # ========================================================================
+  # === PerformanceAnalytics 블록 끝 =======================================
+  # ========================================================================
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   today_date <- max(dd$Date, na.rm = TRUE)
   
   # 5-1) 적립식 10년 Monte Carlo -------------------------------------
@@ -185,8 +226,9 @@ repeat {
     last_mc_date <- today_date
   } else {
     cat("\n[리스크] 오늘(", format(today_date),
-        ") 몬테카는 이미 실행됨 (다음날 재실행)\n\n", sep = "")
+        ") 몬테카를로는 이미 실행됨 (다음날 재실행)\n\n", sep = "")
   }
+  
   
   # 이하 부분은 기존 JS 펀드 모니터링 로직 그대로 -------------------
   sum_left  <- dd$Sum / 10000000
@@ -428,13 +470,13 @@ repeat {
              label = label_text,
              hjust = 0, vjust = 1, size = 5, color = "black")
   
-  calc_cagr <- function(start_date, end_date, start_value, end_value) {
-    years <- as.numeric(difftime(end_date, start_date, units = "days")) / 365.25
-    (end_value / start_value)^(1 / years) - 1
-  }
-  
-  cat("CAGR : ")
-  print(calc_cagr(dd$Date[1], tail(dd$Date, 1), dd$Sum[1], tail(dd$Sum, 1)))
+  # calc_cagr <- function(start_date, end_date, start_value, end_value) {
+  #   years <- as.numeric(difftime(end_date, start_date, units = "days")) / 365.25
+  #   (end_value / start_value)^(1 / years) - 1
+  # }
+  # 
+  # cat("CAGR : ")
+  #print(calc_cagr(dd$Date[1], tail(dd$Date, 1), dd$Sum[1], tail(dd$Sum, 1)))
   
   dd <- dd %>%
     mutate(Peak = cummax(Sum),
