@@ -1,67 +1,59 @@
-###############################################
-# JS 펀드 모니터링 메인 스크립트 (루프 버전)
-# - stock_eval.R / stock_eval_us.R 필요
-# - risk_module.R의 몬테카, MDD, 인출, 팩터, PCA를 모두 호출
-###############################################
+# 1) 필요한 패키지 전부 설치
 
-# 1) 필요한 패키지 전부 설치 ------------------------------------------
 pkg <- c("openxlsx", "rvest", "httr", "patchwork", "ggplot2",
-         "readr", "readxl", "dplyr", "scales", "treemap", "DT", "stringr", "PerformanceAnalytics")
+         "readr", "readxl", "dplyr", "scales", "treemap", "DT")
 new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
 if (length(new.pkg)) {
   install.packages(new.pkg, dependencies = TRUE)
 }
+# 최신 패키지 설치 명령 : update.packages(ask = FALSE, checkBuilt = TRUE)
 
-# 2) 로드 --------- ctrl + alt + e
-library(readr);   library(readxl)
+# 2) 로드        ctrl + alt + e
+library(readr);library(readxl)
 library(openxlsx); library(rvest); library(httr)
-library(dplyr);   library(ggplot2); library(scales)
-library(patchwork); library(treemap); library(DT)
-library(stringr); library(PerformanceAnalytics)
+library(dplyr); library(ggplot2); library(scales)
+library(patchwork);library(treemap);library(DT)
 
-setwd("c:\\easy_r")
+setwd("c:\\easy_r")  # 워킹 디렉토리를 지정한다.(개별 설정이 다를 수 있음)
 
-options(scipen = 999)
-
-# ★ 리스크 + 팩터 + PCA 모듈 로드
-source("risk_module.R")
-
-update_factor_data()
-
-count <- 1
-last_mc_date <- as.Date(NA)
+options(scipen = 999)  # 지수표기(Scientific notation) 끄기
+count <- 1  # 반복 횟수 카운터
 
 repeat {
-  now  <- as.POSIXct(Sys.time())
+  
+  # 현재 시간
+  now <- as.POSIXct(Sys.time())
   hhmm <- format(now, "%H:%M")
-  wday <- as.numeric(format(now, "%u"))  # 1=월 ~ 7=일
+  wday <- as.numeric(format(now, "%u"))  # 요일
   week_kor <- c("일", "월", "화", "수", "목", "금", "토")
   
+  # 실행 구간 판별
   in_fast_range <- hhmm >= "08:40" & hhmm <= "15:30"
   
-  cat("[", count, "회차]", format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"),
-      ": 실행 시작***********************************************\n")
   
-  # 현재 보유자산 평가 업데이트 -------------------------------------
-  source("stock_eval.R")      # data_ko, exchange_rate 등
-  source("stock_eval_us.R")   # data_en 등
+  # 현재 시간과 반복 횟수 출력
+  cat("[", count, "회차]", format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"), ": 실행 시작***********************************************\n")
+  
+  source("stock_eval.R")
+  source("stock_eval_us.R")
   
   today <- Sys.Date()
   
-  file1 <- paste0("output_stock_",    today, ".xlsx")
+  file1 <- paste0("output_stock_", today, ".xlsx")
   file2 <- paste0("output_stock_us_", today, ".xlsx")
   output_file <- "output_sum.csv"
   
   column_name  <- "평가금"
   column_name2 <- "수익금"
   
+  # 3) 엑셀 읽기: readxl::read_excel 사용
   data1 <- read_excel(file1)
   data2 <- read_excel(file2)
   
-  last_value1   <- tail(data1[[column_name]],  1)
+  last_value1   <- tail(data1[[column_name]], 1)
   last_value1_2 <- tail(data1[[column_name2]], 1)
   
-  last_value2   <- tail(data2[[column_name]],  1)
+  last_value2   <- tail(data2[[column_name]], 1)
   last_value2_2 <- tail(data2[[column_name2]], 1)
   
   sum_value    <- round(last_value1 + last_value2, 0)
@@ -73,8 +65,8 @@ repeat {
   
   result <- data.frame(Date = today, Sum = sum_value, Profit = profit_value)
   
-  # output_sum.csv 갱신 ----------------------------------------------
   if (file.exists(output_file)) {
+    # 기존 파일 읽기
     existing_data <- read_csv(output_file,
                               col_types = cols(
                                 Date   = col_date(format = ""),
@@ -83,10 +75,12 @@ repeat {
                               ), 
                               show_col_types = FALSE)
     
+    # ✅ 마지막 행의 Date가 오늘이면 삭제
     if (nrow(existing_data) > 0 && tail(existing_data$Date, 1) == Sys.Date()) {
       existing_data <- existing_data[-nrow(existing_data), ]
     }
     
+    # 새 결과와 합치기
     updated_data <- bind_rows(existing_data, result)
     
   } else {
@@ -95,7 +89,11 @@ repeat {
   
   write_csv(updated_data, output_file)
   
-  # 분석용 데이터 재읽기 ---------------------------------------------
+  # cat("성공적으로 데이터를 추가했습니다! 합산금은 : ",
+  #     sum_value, "원 총수익금은 :", profit_value, "총수익률 : ",
+  #     profit_value / (sum_value - profit_value), "\n")
+  
+  # 5) 분석용 데이터 재읽기 (Date 파싱 보장)
   dd <- read_csv(output_file,
                  col_types = cols(
                    Date   = col_date(format = ""),
@@ -103,142 +101,9 @@ repeat {
                    Profit = col_double()
                  ))
   
+  # 수익률
   dd <- dd %>% mutate(Return = Profit / (Sum - Profit))
   
-  
-  
-  
-  # ========================================================================
-  # === PerformanceAnalytics 블록 시작 =====================================
-  #  - 평가금(Sum) 시계열 → 일별 수익률 → 연환산 성과/Sharpe/MDD 계산
-  # ========================================================================
-  
-  dd_daily <- dd %>%
-    group_by(Date) %>%
-    summarise(Sum = last(Sum), .groups="drop") %>%
-    arrange(Date)
-  
-  sum_xts <- xts(dd_daily$Sum, order.by = dd_daily$Date)
-  ret_xts <- Return.calculate(sum_xts, method="discrete")[-1]
-  # 
-  # # 1) 날짜순 정렬 (혹시 순서가 꼬였을 경우를 대비)
-  # dd <- dd %>% arrange(Date)
-  # 
-  # # 2) 평가금 시계열을 xts로 변환
-  # sum_xts <- xts(dd$Sum, order.by = dd$Date)
-  # 
-  # # 3) 기간별(일별) 수익률 계산
-  # ret_xts <- PerformanceAnalytics::Return.calculate(sum_xts, method = "discrete")
-  # ret_xts <- ret_xts[-1, , drop = FALSE]  # 첫 행 NA 제거
-  colnames(ret_xts) <- "JS_Fund"
-  
-  # 4) 성과 요약 출력
-  cat("\n=========== PerformanceAnalytics 성과 요약 ===========\n")
-  print(table.AnnualizedReturns(ret_xts))
-  cat("\nMax Drawdown:\n")
-  print(maxDrawdown(ret_xts))
-  cat("Sharpe(연환산, Rf=0):\n")
-  print(SharpeRatio.annualized(ret_xts, Rf = 0))
-  cat("======================================================\n\n")
-  
-  # ========================================================================
-  # === PerformanceAnalytics 블록 끝 =======================================
-  # ========================================================================
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  today_date <- max(dd$Date, na.rm = TRUE)
-  
-  # 5-1) 적립식 10년 Monte Carlo -------------------------------------
-  if (is.na(last_mc_date) || last_mc_date < today_date) {
-    cat("\n[리스크] 오늘 기준 몬테카를로 10년 스트레스 테스트 실행...\n")
-    run_mc_from_dd(
-      dd,
-      years           = 10,
-      monthly_contrib = 5000000,
-      n_sims          = 5000
-    )
-    
-    cat("[리스크] 미래 10년 최대낙폭(MDD) 분포 시뮬레이션 실행...\n")
-    run_future_mdd_from_dd(
-      dd,
-      years           = 10,
-      monthly_contrib = 5000000,
-      n_sims          = 2000
-    )
-    
-    cat("[리스크] 은퇴 후 30년, 연 2억 인출 시나리오(현재자산 기준) 시뮬레이션 실행...\n")
-    run_mc_withdraw_from_dd(
-      dd,
-      years           = 30,
-      annual_withdraw = 200000000,
-      n_sims          = 5000,
-      withdraw_freq   = "monthly"
-      # initial_value 기본값(NULL) → 현재 Sum으로 시작
-    )
-    
-    # (선택 예시) 10년 후 60억으로 은퇴했다고 가정한 시나리오도 보고 싶다면:
-    # cat("[리스크] 가정: 10년 후 60억으로 은퇴, 연 2억 인출 시나리오 시뮬레이션...\n")
-    # run_mc_withdraw_from_dd(
-    #   dd,
-    #   years           = 30,
-    #   annual_withdraw = 200000000,
-    #   n_sims          = 5000,
-    #   withdraw_freq   = "monthly",
-    #   initial_value   = 60000000000   # 60억 가정
-    # )
-    weights <- c(
-      asset_SPY_ETC / today_tsum,
-      asset_SCHD    / today_tsum,
-      asset_QQQ     / today_tsum,
-      asset_TQQQ    / today_tsum,
-      asset_GLD     / today_tsum,
-      asset_BOND    / today_tsum
-    )
-    
-    # ★ 팩터 분석: factors_monthly.csv 가 있을 때만 실행 ----------------
-    #  - 예: Date, MKT, VALUE, SIZE, MOM ... 형태의 월간 팩터 수익률 데이터
-    if (file.exists("factors_monthly.csv")) {
-      # ===== PCA 기반 리스크 분해 =====
-      cat("[리스크] PCA 기반 리스크 분해(Principal Component Risk) 실행...\n")
-      #run_pca_dashboard_from_file("asset_returns_monthly.csv", weights)
-    } else {
-      cat("[리스크] 팩터 데이터(factors_monthly.csv)를 찾을 수 없어 팩터 분석을 건너뜁니다.\n")
-    }
-    
-    # ★ PCA 분석: asset_returns_monthly.csv 가 있을 때만 실행 ----------
-    #  - 예: Date, SPY, SCHD, QQQ, TQQQ, GOLD, BOND 형식의 월간 수익률
-    if (file.exists("asset_returns_monthly.csv")) {
-      #cat("[리스크] PCA 기반 리스크 분해(Principal Component Risk) 실행...\n")
-      # 자산별 장기 목표 비중 또는 현재 비중 사용 (예시 비중)
-      # weights <- c(
-      #   0.40,  # SPY등
-      #   0.20,  # SCHD
-      #   0.15,  # QQQ
-      #   0.10,  # TQQQ
-      #   0.10,  # GOLD
-      #   0.05   # BOND
-      # )
-      run_pca_dashboard_from_file("asset_returns_monthly.csv", weights)
-    } else {
-      cat("[리스크] PCA용 자산수익률 파일(asset_returns_monthly.csv)이 없어 PCA 분석을 건너뜁니다.\n")
-    }
-    
-    last_mc_date <- today_date
-  } else {
-    cat("\n[리스크] 오늘(", format(today_date),
-        ") 몬테카를로는 이미 실행됨 (다음날 재실행)\n\n", sep = "")
-  }
-  
-  
-  # 이하 부분은 기존 JS 펀드 모니터링 로직 그대로 -------------------
   sum_left  <- dd$Sum / 10000000
   ret_right <- dd$Return * 100
   
@@ -250,7 +115,9 @@ repeat {
   
   start_date <- format(min(dd$Date, na.rm = TRUE), "%Y-%m-%d")
   end_date   <- format(max(dd$Date, na.rm = TRUE), "%Y-%m-%d")
-  plot_title <- paste0("JS 펀드 주식평가액 분석 (", start_date, " ~ ", end_date, ")  ",
+  #plot_title <- paste0("주식평가액 분석 (", start_date, " ~ ", end_date, ")  ",
+  #                     format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분"))
+  plot_title <- paste0("주식평가액 분석 (", start_date, " ~ ", end_date, ")  ",
                        format(Sys.time(), "%Y년 %m월 %d일"), 
                        "(",
                        week_kor[as.numeric(format(Sys.Date(), "%w")) + 1], 
@@ -258,47 +125,65 @@ repeat {
                        format(Sys.time(), "%H시 %M분"))
   
   df <- dd[1:2]
+  
+  # 날짜형 변환
   df$Date <- as.Date(df$Date)
+  
+  # 마지막 날짜
   last_date <- max(df$Date, na.rm = TRUE)
   
+  # 비교할 기간 벡터 (1개월, 3개월, 6개월, 12개월)
   periods <- c(1, 3, 6, 12)
   
-  result_period <- data.frame(
-    Period       = paste0(periods, "개월 전"),
-    Target_Date  = as.Date(NA),
+  # 한 달 단위로 Sum값 비교
+  result <- data.frame(
+    Period = paste0(periods, "개월 전"),
+    Target_Date = as.Date(NA),
     Closest_Date = as.Date(NA),
-    Sum          = NA,
-    Diff         = NA
+    Sum = NA,
+    Diff = NA
   )
   
   for (i in seq_along(periods)) {
+    # 목표 날짜 계산
     target <- seq(last_date, length = 2, by = paste0("-", periods[i], " month"))[2]
+    
+    # 실제 데이터 중 가장 가까운 날짜
     idx <- which.min(abs(df$Date - target))
     closest_date <- df$Date[idx]
-    sum_value_p <- df$Sum[idx]
-    latest_sum <- df$Sum[df$Date == last_date]
-    diff_value <- latest_sum - sum_value_p
+    sum_value <- df$Sum[idx]
     
-    result_period[i, ] <- c(
+    # 마지막 날짜의 Sum
+    latest_sum <- df$Sum[df$Date == last_date]
+    
+    # 차이 계산
+    diff_value <- latest_sum - sum_value
+    
+    # 결과 저장
+    result[i, ] <- c(
       paste0(periods[i], "개월 전"),
       as.character(target),
       as.character(closest_date),
-      sum_value_p,
+      sum_value,
       diff_value
     )
   }
   
-  result_period$Sum  <- as.numeric(result_period$Sum)
-  result_period$Diff <- as.numeric(result_period$Diff)
+  # 수치형 변환
+  result$Sum <- as.numeric(result$Sum)
+  result$Diff <- as.numeric(result$Diff)
   
-  # 구성비율 트리맵 ---------------------------------------------------
+  
+  
+  
+  # 구성비율 트리맵 그리기
   dt_ko <- data_ko %>% 
     head(-1) %>% 
-    dplyr::select(종목명, 종목번호, 보유증권사, 평가금, 매수가격, 수량)
+    select(종목명, 종목번호, 보유증권사, 평가금, 매수가격, 수량)
   
   dt_en <- data_en %>% 
     head(-2) %>% 
-    dplyr::select(종목명, 종목번호, 보유증권사, 평가금, 매수가격, 수량)
+    select(종목명, 종목번호, 보유증권사, 평가금, 매수가격, 수량)
   
   dt_ko <- dt_ko %>% 
     mutate(한화평가금 = 평가금) %>% 
@@ -308,13 +193,13 @@ repeat {
     mutate(한화평가금 = 평가금 * exchange_rate) %>% 
     mutate(한화매수가격 = 매수가격 * exchange_rate)
   
-  dt_fn <- bind_rows(dt_ko, dt_en)
+  dt_fn <- bind_rows(dt_ko, dt_en)  # 한국주식 + 미국주식
   
   dt_fn <- dt_fn %>% 
-    dplyr::select(-평가금) %>% 
+    select(-평가금) %>% 
     arrange(desc(한화평가금))
   
-  View(dt_fn)
+  View(dt_fn)  # 한국주식과 미국주식 합친 테이블
   
   treemap(
     dt_fn,
@@ -327,10 +212,10 @@ repeat {
     fontface.labels = 2,
     bg.labels = 0,
     overlap.labels = 0.5,
-    inflate.labels = TRUE,
-    align.labels = list(c("center","center"))
+    inflate.labels = TRUE,                 # 작아도 표시
+    align.labels = list(c("center","center")) # 중앙 정렬
   )
-  
+  # Date는 숫자형으로 변환해 회귀 (안전)
   fit <- lm(sum_left ~ as.numeric(Date), data = dd)
   slope_per_day <- coef(fit)[2]
   
@@ -344,77 +229,72 @@ repeat {
     files[which.max(dates[valid_idx])]
   }
   
+  # ── 전일 데이터 불러오기 ──────────────────────────────
   data_prev_ko <- read_excel(get_prev_file("output_stock_"))
   data_prev_en <- read_excel(get_prev_file("output_stock_us_"))
   
   data_prev_ko <- data_prev_ko %>%
     head(-1) %>%
-    dplyr::select(종목번호, 보유증권사, 전일한화평가금 = 평가금)
+    select(종목번호, 보유증권사, 전일한화평가금 = 평가금)
   
   data_prev_en <- data_prev_en %>%
     head(-2) %>%
     mutate(한화평가금 = 평가금 * exchange_rate) %>%
-    dplyr::select(종목번호, 보유증권사, 전일한화평가금 = 한화평가금)
+    select(종목번호, 보유증권사, 전일한화평가금 = 한화평가금)
   
   data_prev_fn <- bind_rows(data_prev_ko, data_prev_en) %>%
     arrange(desc(전일한화평가금))
   
+  # ── 오늘 vs 전일 비교 함수 ──────────────────────────────
   join_stock_data <- function(today_df, prev_df) {
     today_df %>%
       distinct(종목번호, 보유증권사, .keep_all = TRUE) %>%
       left_join(prev_df, by = c("종목번호", "보유증권사")) %>%
       mutate(
-        한화평가금 = trunc(한화평가금),
-        전일한화평가금 = trunc(전일한화평가금),
-        전일대비 = trunc(한화평가금 - 전일한화평가금),
+        한화평가금 = trunc(한화평가금),               
+        전일한화평가금 = trunc(전일한화평가금),       
+        전일대비 = trunc(한화평가금 - 전일한화평가금), 
+        
+        # 소수점 둘째자리까지 반올림 후 고정 표시
         전일대비율 = if_else(
           is.na(전일한화평가금),
           NA_character_,
           sprintf("%.2f", round((한화평가금 - 전일한화평가금) / 전일한화평가금 * 100, 2))
         ),
+        
         비중 = sprintf("%.2f", round(한화평가금 / sum(한화평가금, na.rm = TRUE) * 100, 2))
       ) %>%
       arrange(desc(한화평가금))
   }
   
+  # 종합 테이블
   rt <- join_stock_data(dt_fn, data_prev_fn) %>%
     mutate(
-      총매수금 = 한화매수가격 * 수량,
-      총수익금 = 한화평가금 - 총매수금,
-      총수익률 = round((총수익금 / 총매수금) * 100, 2)
+      총매수금 = 한화매수가격 * 수량,                     # 매수금(원)
+      총수익금 = 한화평가금 - 총매수금,                   # 총수익금 계산
+      총수익률 = round((총수익금 / 총매수금) * 100, 2)    # 총수익률(%) 계산
     ) %>% 
-    dplyr::select(-매수가격) %>% 
-    dplyr::select(종목명, 보유증권사, 한화매수가격, 수량, 한화평가금, 전일한화평가금,
-                  전일대비, 전일대비율, 비중, 총매수금, 총수익금, 총수익률)
+    select(-매수가격) %>% 
+    select(종목명, 보유증권사, 한화매수가격, 수량, 한화평가금, 전일한화평가금,
+           전일대비, 전일대비율, 비중, 총매수금, 총수익금, 총수익률)
   
-  today_tsum <- tail(dd$Sum, 1)
+  today_tsum = tail(dd$Sum, 1)  # 오늘 한화평가금 합계
   
-  asset_SCHD <- rt %>% filter(str_detect(종목명, "미국배당다우|SCHD")) %>%
-    summarise(합계 = sum(한화평가금)) %>% pull(합계)
-  asset_QQQ  <- rt %>% filter(str_detect(종목명, "나스닥100|QQQ"),
-                              !str_detect(종목명, "TQQQ")) %>%
-    summarise(합계 = sum(한화평가금)) %>% pull(합계)
-  asset_TQQQ <- rt %>% filter(str_detect(종목명, "TQQQ")) %>%
-    summarise(합계 = sum(한화평가금)) %>% pull(합계)
-  asset_GLD  <- rt %>% filter(str_detect(종목명, "금현물")) %>%
-    summarise(합계 = sum(한화평가금)) %>% pull(합계)
-  asset_BOND <- rt %>% filter(str_detect(종목명, "채권|국채")) %>%
-    summarise(합계 = sum(한화평가금)) %>% pull(합계)
+  asset_SCHD = rt %>% filter(str_detect(종목명, "미국배당다우|SCHD")) %>% summarise(합계 = sum(한화평가금))
+  # QQQ 계열 ETF를 검색하되 TQQQ는 제외
+  asset_QQQ = rt %>% filter(str_detect(종목명, "나스닥100|QQQ"),!str_detect(종목명, "TQQQ")) %>% summarise(합계 = sum(한화평가금))
+  asset_TQQQ = rt %>% filter(str_detect(종목명, "TQQQ")) %>% summarise(합계 = sum(한화평가금))
+  asset_GLD = rt %>% filter(str_detect(종목명, "금현물")) %>% summarise(합계 = sum(한화평가금))
+  asset_BOND = rt %>% filter(str_detect(종목명, "채권|국채")) %>% summarise(합계 = sum(한화평가금))
+  # 위의 것들에 속하지 않으면 SPY 및 기타주식(asset_SPY_ETC 변수)으로 간주하자
+  asset_SPY_ETC = today_tsum - asset_SCHD - asset_QQQ - asset_TQQQ - asset_GLD - asset_BOND  
+  asset_SCHD_ratio = asset_SCHD / today_tsum * 100
+  asset_QQQ_ratio = asset_QQQ / today_tsum * 100
+  asset_TQQQ_ratio = asset_TQQQ / today_tsum * 100
+  asset_GLD_ratio = asset_GLD / today_tsum * 100
+  asset_BOND_ratio = asset_BOND / today_tsum * 100
+  asset_SPY_ETC_ratio = asset_SPY_ETC / today_tsum * 100
   
-  asset_SCHD[is.na(asset_SCHD)] <- 0
-  asset_QQQ[is.na(asset_QQQ)]   <- 0
-  asset_TQQQ[is.na(asset_TQQQ)] <- 0
-  asset_GLD[is.na(asset_GLD)]   <- 0
-  asset_BOND[is.na(asset_BOND)] <- 0
-  
-  asset_SPY_ETC <- today_tsum - asset_SCHD - asset_QQQ - asset_TQQQ - asset_GLD - asset_BOND
-  
-  asset_SCHD_ratio    <- asset_SCHD    / today_tsum * 100
-  asset_QQQ_ratio     <- asset_QQQ     / today_tsum * 100
-  asset_TQQQ_ratio    <- asset_TQQQ    / today_tsum * 100
-  asset_GLD_ratio     <- asset_GLD     / today_tsum * 100
-  asset_BOND_ratio    <- asset_BOND    / today_tsum * 100
-  asset_SPY_ETC_ratio <- asset_SPY_ETC / today_tsum * 100
   
   label_text <- paste0(
     "오늘평가액 : ", comma(round(today_tsum, 0)), "원   ",
@@ -426,11 +306,12 @@ repeat {
     round((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) * 100 / tail(dd$Sum, 1), 2),
     "%)" ,
     "  1일 평균 증가액 : ", comma(round(slope_per_day * 10000000, 0)), "(원/일)   \n",
-    "(증분)1개월간 :", format(result_period$Diff[1], big.mark = ","), 
-    "    3개월간 :", format(result_period$Diff[2], big.mark = ","), 
-    "    6개월간 :", format(result_period$Diff[3], big.mark = ","), 
-    "    1년간   :", format(result_period$Diff[4], big.mark = ","), "\n",
+    "(증분)1개월간 :", format(result$Diff[1], big.mark = ","), 
+    "    3개월간 :", format(result$Diff[2], big.mark = ","), 
+    "    6개월간 :", format(result$Diff[3], big.mark = ","), 
+    "    1년간   :", format(result$Diff[4], big.mark = ","), "\n",
     "SPY등:SCHD:QQQ:TQQQ:금:채권(최종목표%) = 40.0 : 20.0 : 15.0 : 10.0 : 10.0 : 5.0\n",
+    # "SPY등:SCHD:QQQ:TQQQ:금:채권(최종목표%) = 32.0 : 18.0 : 15.0 :  8.0 : 17.0 : 10.0\n",
     "SPY등:SCHD:QQQ:TQQQ:금:채권(현재비율%) = ", 
     format(round(asset_SPY_ETC_ratio, 1), nsmall = 1)," : ",
     format(round(asset_SCHD_ratio,    1), nsmall = 1)," : ",
@@ -438,6 +319,8 @@ repeat {
     format(round(asset_TQQQ_ratio,    1), nsmall = 1)," : ",
     format(round(asset_GLD_ratio,     1), nsmall = 1)," : ",
     format(round(asset_BOND_ratio,    1), nsmall = 1),"\n",
+
+    # 수익최대화 버전     
     "SPY등:SCHD:QQQ:TQQQ:금:채권(목표억원  ) = ",
     format(round(today_tsum *  .4  / 100000000, 1), nsmall = 1)," : ",
     format(round(today_tsum *  .2  / 100000000, 1), nsmall = 1)," : ",
@@ -445,6 +328,18 @@ repeat {
     format(round(today_tsum *  .1  / 100000000, 1), nsmall = 1)," : ",
     format(round(today_tsum *  .1  / 100000000, 1), nsmall = 1)," : ",
     format(round(today_tsum *  .05 / 100000000, 1), nsmall = 1), "\n",
+    
+    # sharpe 최대화 버전 SPY 32 / QQQ 18 / SCHD 15 / TQQQ 8 / 금 17 / 채권 10
+    # "SPY등:SCHD:QQQ:TQQQ:금:채권(목표억원  ) = ", 
+    # format(round(today_tsum *  .32  / 100000000, 1), nsmall = 1)," : ",
+    # format(round(today_tsum *  .18  / 100000000, 1), nsmall = 1)," : ",
+    # format(round(today_tsum *  .15 / 100000000, 1), nsmall = 1)," : ",
+    # format(round(today_tsum *  .08  / 100000000, 1), nsmall = 1)," : ",
+    # format(round(today_tsum *  .17  / 100000000, 1), nsmall = 1)," : ",
+    # format(round(today_tsum *  .10 / 100000000, 1), nsmall = 1), "\n",
+    # 
+    
+    
     "SPY등:SCHD:QQQ:TQQQ:금:채권(현재억원  ) = ", 
     format(round(asset_SPY_ETC / 100000000, 1), nsmall = 1)," : ",
     format(round(asset_SCHD    / 100000000, 1), nsmall = 1)," : ",
@@ -478,14 +373,20 @@ repeat {
              label = label_text,
              hjust = 0, vjust = 1, size = 5, color = "black")
   
-  # calc_cagr <- function(start_date, end_date, start_value, end_value) {
-  #   years <- as.numeric(difftime(end_date, start_date, units = "days")) / 365.25
-  #   (end_value / start_value)^(1 / years) - 1
-  # }
-  # 
-  # cat("CAGR : ")
-  #print(calc_cagr(dd$Date[1], tail(dd$Date, 1), dd$Sum[1], tail(dd$Sum, 1)))
   
+  # 보조: 선형모형(날짜 → Sum)
+  model <- lm(Sum / 10000000 ~ as.numeric(Date), data = dd)
+  
+  # CAGR 함수 및 계산 (Date 형 보장)
+  calc_cagr <- function(start_date, end_date, start_value, end_value) {
+    years <- as.numeric(difftime(end_date, start_date, units = "days")) / 365.25
+    (end_value / start_value)^(1 / years) - 1
+  }
+  
+  cat("CAGR : ")
+  print(calc_cagr(dd$Date[1], tail(dd$Date, 1), dd$Sum[1], tail(dd$Sum, 1)))
+  
+  # ===== MDD =====
   dd <- dd %>%
     mutate(Peak = cummax(Sum),
            DD   = ifelse(Peak > 0, Sum / Peak - 1, 0))
@@ -524,15 +425,20 @@ repeat {
     annotate("label", x = mdd_end_date, y = (mdd_value * 100) + 5,
              label = paste0("MDD: ", scales::percent(-mdd_value, accuracy = 0.01)),
              vjust = 1, hjust = 0.5) +
-    labs(title = paste0("Drawdown(", tail(dd, 1)[6] * 100, "%, ", 
-                        tail(dd,1)[2] - tail(dd,1)[5], "원)"), 
-         x = "날짜", 
-         y = "Drawdown (%)") +
+    labs(title = paste0("Drawdown(", tail(dd, 1)[6] * 100, "%)"), x = "날짜", y = "Drawdown (%)") +
     theme_minimal(base_size = 13)
   
-  combined_plot <- p / p_dd + patchwork::plot_layout(heights = c(2, 1))
-  suppressMessages(print(combined_plot))
+  combined_plot <- p / p_dd + plot_layout(heights = c(2, 1))
+  suppressMessages(
+    print(combined_plot)
+  )
   
+  
+  
+  
+  
+  
+  #print(label_text)
   print(
     paste(
       "국내주식수 :", dim(data1)[1] - 1,
@@ -540,6 +446,7 @@ repeat {
       " 환율 :", exchange_rate,"원/달러"
     )
   )
+  
   
   print(
     datatable(
@@ -558,6 +465,8 @@ repeat {
         digits = 0
       ) %>%
       formatRound(columns = c("전일대비율", "비중", "총수익률"), digits = 2) %>%
+      
+      # 🎨 전일대비 / 총수익금: 음수=빨강, 0=검정, 양수=파랑
       formatStyle(
         columns = c("전일대비", "총수익금"),
         color = styleInterval(
@@ -569,6 +478,8 @@ repeat {
           c("bold", "normal")
         )
       ) %>%
+      
+      # 🎨 전일대비율 / 총수익률: 음수=빨강, 0=회색, 양수=파랑
       formatStyle(
         columns = c("전일대비율", "총수익률"),
         color = styleInterval(
@@ -583,264 +494,32 @@ repeat {
   )
   
   print(tail(dd,2))
-  
-  
-  
-  ##### ===========================
-  #####  리스크 엔진 실행 구간
-  ##### ===========================
-  
-  # 현재 포트폴리오 비중 (메인 코드에서 이미 계산됨)
-  weights <- c(
-    SPY_ETC = asset_SPY_ETC_ratio / 100,
-    SCHD    = asset_SCHD_ratio    / 100,
-    QQQ     = asset_QQQ_ratio     / 100,
-    TQQQ    = asset_TQQQ_ratio    / 100,
-    GLD     = asset_GLD_ratio     / 100,
-    BOND    = asset_BOND_ratio    / 100
-  )
-  
-  # 목표 비중
-  target_weights <- c(
-    SPY_ETC = 0.40,
-    SCHD    = 0.20,
-    QQQ     = 0.15,
-    TQQQ    = 0.10,
-    GLD     = 0.10,
-    BOND    = 0.05
-  )
-  
-  current_nav <- tail(dd$Sum, 1)
-  
-  cat("\n\n================ 리스크 분석 시작 ================\n")
-  
-  # 1) Stress Test Replay
-  run_stress_replay_from_file(
-    asset_file     = "asset_returns_monthly.csv",
-    weights        = weights,
-    current_nav    = current_nav,
-    monthly_contrib = 0
-  )
-  
-  # 2) VaR / CVaR
-  run_var_cvar_from_file(
-    asset_file  = "asset_returns_monthly.csv",
-    weights     = weights,
-    current_nav = current_nav,
-    alpha       = 0.95
-  )
-  
-  # 3) DRIFT 기반 리밸런싱 신호
-  run_drift_rebal_signal(
-    target_weights = target_weights,
-    current_weights = weights,
-    threshold = 0.05
-  )
-  
-  cat("================ 리스크 분석 종료 ================\n\n")
-  
-  
-  
-  
   cat("장중 10분 그이외는 1시간 후에 다시 실행됨(중단을 원하면 Interrupt-R 빨간버튼 클릭)",
       format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"),"\n\n")
   
   View(rt)
   
+  # 반복 횟수 증가
   count <- count + 1
   
-  if (in_fast_range & (wday >= 1 & wday <= 5)) {
-    wait_min <- 10
+  
+  # 다음 대기시간 설정 -------------------------------------
+  if (in_fast_range & (wday >= 1 & wday <= 5)) {  # 월 ~ 금일 때만
+    wait_min <- 10     # 거래시간대: 10분 간격
   } else {
-    wait_min <- 60
+    wait_min <- 60     # 비거래시간대: 1시간 간격
   }
+  
   Sys.sleep(wait_min * 60)
+  
 }
 
 
-
-# 이 프로그램은 “수익을 만들어주는 엔진”이 아니라
-# “수익을 망가뜨리는 행동을 제거해서
-# 결과적으로 장기 수익을 극대화하는 장치”입니다.
-# 
-# 아래는 **개인투자자가 이 PMS를 써서 실제로 수익을 극대화할 수 있는 ‘가장 현실적인 활용법’**입니다.
-# 
-# 1️⃣ 이 PMS로 “하지 말아야 할 행동”을 먼저 제거하라 (가장 중요)
-# 
-# 대부분의 개인투자 수익을 갉아먹는 건 다음입니다.
-# 
-# 급락 시 공포 매도
-# 
-# 상승장 후 레버리지 과다
-# 
-# 은퇴 인출률 착각
-# 
-# 리밸런싱 타이밍을 감정으로 결정
-# 
-# 👉 이 PMS는 이 네 가지를 모두 정면에서 막아줍니다.
-# 
-# 활용 원칙 ①
-# 
-# PMS 결과와 충돌하는 매매는 “자동으로 보류”한다
-# 
-# 예:
-#   
-#   DRIFT가 “리밸런싱 불필요” → 매매 금지
-# 
-# CVaR가 9%인데, 손실 5%에 공포 → 정상 구간
-# 
-# 이 한 가지만 지켜도 대부분 개인을 능가합니다.
-# 
-# 2️⃣ “수익을 늘리는 행동”은 단 하나만 하라
-# 
-# 수익 극대화는 많은 행동이 아니라 딱 하나에서 옵니다.
-# 
-# ✔️ 리밸런싱을 규칙적으로, 기계적으로
-# 
-# 이 PMS가 가장 강력한 이유는:
-#   
-#   언제 팔지
-# 
-# 언제 살지
-# 
-# 얼마나 조정할지
-# 
-# 를 숫자로 알려주기 때문입니다.
-# 
-# 활용 원칙 ②
-# 
-# DRIFT ±5%p 또는 MDD 분위수 80% 이상일 때만 행동
-# 
-# 예:
-#   
-#   SPY 비중 +7%p 초과 → 분할 매도
-# 
-# TQQQ 비중 -6%p → 추가 매수 고려
-# 
-# MDD가 과거 분포 상위 20% → 현금·방어자산 이동
-# 
-# → 이건 사실상 **개인용 ‘규칙 기반 CTA’**입니다.
-# 
-# 3️⃣ Monte Carlo는 “기대수익”이 아니라 “기대실망”을 보는데 써라
-# 
-# 사람들이 Monte Carlo를 잘못 쓰는 방식:
-#   
-#   “중앙값이 50억이네? 좋다!”
-# 
-# 올바른 방식:
-#   
-#   “10% 분위수에서 내가 멘탈을 유지할 수 있나?”
-# 
-# 활용 원칙 ③
-# 
-# 내가 감내 가능한 최악 시나리오를 기준으로 포트폴리오를 조정
-# 
-# 예:
-#   
-#   10% 분위수 결과가 너무 낮다 → 레버리지 축소
-# 
-# 은퇴 인출 파산확률 80% → 인출액 조정 or 현금 비중 확대
-# 
-# 👉 이건 멘탈 관리 = 수익 관리입니다.
-# 
-# 4️⃣ PCA는 “분산 착각을 깨는 용도”로 써라
-# 
-# 지금 결과를 보면:
-#   
-#   PC1 = 94~95%
-# 
-# 사실상 미국 주식 베타 하나
-# 
-# 이걸 보고 해야 할 행동은 단순합니다.
-# 
-# 활용 원칙 ④
-# 
-# PC1 기여도가 90% 넘으면 ‘공격 확장 금지’
-# 
-# 즉:
-#   
-#   TQQQ 비중 늘리고 싶다? ❌
-# 
-# PC1 낮추는 자산(현금·채권·금) 늘리기? ⭕
-# 
-# 이 원칙 하나로 대형 손실 확률이 급감합니다.
-# 
-# 5️⃣ VaR / CVaR는 “내가 감정적으로 버틸 수 있는지” 체크하는 용도
-# 
-# 지금:
-#   
-#   CVaR(95%) ≈ -8.9% ≈ -1.1억
-#        
-#        이걸 이렇게 쓰세요.
-#        
-#        활용 원칙 ⑤
-#        
-#        CVaR 손실 금액을 “현금으로 이미 잃었다고 가정”
-#        
-#        “이미 1.1억 잃었다고 생각해도 괜찮은가?”
-#        
-#        괜찮다 → 그대로 유지
-#        
-#        안 괜찮다 → 포트폴리오가 과격
-#        
-#        이건 심리적으로 엄청 강력합니다.
-#        
-#        6️⃣ 은퇴 시뮬레이션은 “수익 극대화”보다 “삶 보호”에 쓰라
-#        
-#        연 2억 인출 → 파산확률 80%대
-#        이건 실패가 아니라 정보입니다.
-#        
-#        활용 원칙 ⑥
-#        
-#        은퇴 전에는 ‘최대 수익’, 은퇴 후에는 ‘최소 파산’
-#        
-#        은퇴 전: 성장자산 비중 허용
-#        
-#        은퇴 3~5년 전: 파산확률 20% 이하로 낮추는 구조로 전환
-#        
-#        이 PMS는 전환 시점을 수치로 보여줍니다.
-#        
-#        7️⃣ 가장 중요한 마지막 원칙 (진짜 핵심)
-#        
-#        ❝ 이 PMS로 ‘무엇을 할지’보다
-#        ‘무엇을 하지 않을지’를 먼저 정하라 ❞
-#        
-#        추천 사용 규칙 (요약)
-#        
-#        PMS 결과를 보기 전 매매 금지
-#        
-#        DRIFT ±5%p 미만 → 아무것도 안 함
-#        
-#        MDD가 역사적 상위 20% → 공격 금지
-#        
-#        CVaR 손실이 잠 못 잘 수준 → 구조 조정
-#        
-#        Monte Carlo 10% 분위수 기준으로만 전략 변경
-#        
-#        이 다섯 가지만 지키면:
-#          
-#          매매 횟수 ↓
-#        
-#        실수 ↓
-#        
-#        감정 개입 ↓
-#        
-#        장기 수익률 ↑
-#        
-#        🎯 최종 결론 (주관적이지만 확신)
-#        
-#        이 PMS는 “개인의 수익률 상한을 높이기보다는
-#        수익률 하한을 크게 끌어올리는 도구”입니다.
-#        
-#        그리고 장기 투자에서 진짜 부자는
-#        상한이 아니라 하한을 관리한 사람입니다.
-#        
-#        이 시스템을:
-#          
-#          매일 들여다보지 말고
-#        
-#        정해진 시점에만 보고
-#        
-#        결과와 다를 때만 행동한다면
-#        
-#        👉 개인투자자로서 할 수 있는 최고 수준의 자산관리 방식 중 하나입니다.
+# 연 1회 리밸런싱 (가장 추천)
+# 매년 1월 1일:
+#  SPY 40
+#  QQQ 20
+#  SCHD 15
+#  TQQQ 10
+#  금 10
+#  채권 5
