@@ -1,55 +1,50 @@
 ###############################################
 # JS 펀드 모니터링 메인 스크립트 (루프 버전)
-# - stock_eval.R / stock_eval_us.R 가 같은 폴더에 있어야 함
-# - risk_module.R 에서 리스크 분석 함수들을 가져와 사용
+# - stock_eval.R / stock_eval_us.R 필요
+# - risk_module.R의 몬테카, MDD, 인출, 팩터, PCA를 모두 호출
 ###############################################
 
 # 1) 필요한 패키지 전부 설치 ------------------------------------------
-
 pkg <- c("openxlsx", "rvest", "httr", "patchwork", "ggplot2",
          "readr", "readxl", "dplyr", "scales", "treemap", "DT", "stringr")
 new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
 if (length(new.pkg)) {
   install.packages(new.pkg, dependencies = TRUE)
 }
-# 최신 패키지 설치 명령 : update.packages(ask = FALSE, checkBuilt = TRUE)
 
 # 2) 로드 --------------------------------------------------------------
-
 library(readr);   library(readxl)
 library(openxlsx); library(rvest); library(httr)
 library(dplyr);   library(ggplot2); library(scales)
 library(patchwork); library(treemap); library(DT)
 library(stringr)
 
-setwd("c:\\easy_r")  # 워킹 디렉토리
+setwd("c:\\easy_r")
 
-options(scipen = 999)  # 지수표기 끄기
+options(scipen = 999)
 
-# ★ 리스크 모듈 로드 (risk_module.R 파일이 같은 폴더에 있어야 함)
+# ★ 리스크 + 팩터 + PCA 모듈 로드
 source("risk_module.R")
 
-count <- 1  # 반복 횟수 카운터
-last_mc_date <- as.Date(NA)  # 몬테카를로 일 1회 실행 제어용 (원하면 사용/미사용 선택)
+update_factor_data()
+
+count <- 1
+last_mc_date <- as.Date(NA)
 
 repeat {
-  
-  # 현재 시간 ----------------------------------------------------------
   now  <- as.POSIXct(Sys.time())
   hhmm <- format(now, "%H:%M")
-  wday <- as.numeric(format(now, "%u"))  # 요일 (1=월 ~ 7=일)
+  wday <- as.numeric(format(now, "%u"))  # 1=월 ~ 7=일
   week_kor <- c("일", "월", "화", "수", "목", "금", "토")
   
-  # 실행 구간 판별
   in_fast_range <- hhmm >= "08:40" & hhmm <= "15:30"
   
-  # 반복 정보 출력 -----------------------------------------------------
   cat("[", count, "회차]", format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"),
       ": 실행 시작***********************************************\n")
   
-  # 보유자산 평가용 스크립트 실행 (국내/해외)
-  source("stock_eval.R")      # data_ko, exchange_rate 등 갱신
-  source("stock_eval_us.R")   # data_en 등 갱신
+  # 현재 보유자산 평가 업데이트 -------------------------------------
+  source("stock_eval.R")      # data_ko, exchange_rate 등
+  source("stock_eval_us.R")   # data_en 등
   
   today <- Sys.Date()
   
@@ -60,7 +55,6 @@ repeat {
   column_name  <- "평가금"
   column_name2 <- "수익금"
   
-  # 3) 엑셀 읽기 -------------------------------------------------------
   data1 <- read_excel(file1)
   data2 <- read_excel(file2)
   
@@ -79,7 +73,7 @@ repeat {
   
   result <- data.frame(Date = today, Sum = sum_value, Profit = profit_value)
   
-  # 4) output_sum.csv 갱신 --------------------------------------------
+  # output_sum.csv 갱신 ----------------------------------------------
   if (file.exists(output_file)) {
     existing_data <- read_csv(output_file,
                               col_types = cols(
@@ -89,7 +83,6 @@ repeat {
                               ), 
                               show_col_types = FALSE)
     
-    # 오늘 행이 이미 있으면 삭제 후 덮어쓰기
     if (nrow(existing_data) > 0 && tail(existing_data$Date, 1) == Sys.Date()) {
       existing_data <- existing_data[-nrow(existing_data), ]
     }
@@ -102,7 +95,7 @@ repeat {
   
   write_csv(updated_data, output_file)
   
-  # 5) 분석용 데이터 재읽기 -------------------------------------------
+  # 분석용 데이터 재읽기 ---------------------------------------------
   dd <- read_csv(output_file,
                  col_types = cols(
                    Date   = col_date(format = ""),
@@ -110,14 +103,11 @@ repeat {
                    Profit = col_double()
                  ))
   
-  # 수익률 (누적 수익률이 아닌, dd 자체는 그대로 두고,
-  # 리스크 분석용 수익률은 risk_module에서 따로 계산)
   dd <- dd %>% mutate(Return = Profit / (Sum - Profit))
   
-  # ★ 여기서부터 risk_module 함수 사용 가능 ---------------------------
   today_date <- max(dd$Date, na.rm = TRUE)
   
-  # 5-1) 적립식 10년 Monte Carlo (일 1회만 실행하고 싶으면 last_mc_date 사용)
+  # 5-1) 적립식 10년 Monte Carlo -------------------------------------
   if (is.na(last_mc_date) || last_mc_date < today_date) {
     cat("\n[리스크] 오늘 기준 몬테카를로 10년 스트레스 테스트 실행...\n")
     run_mc_from_dd(
@@ -135,23 +125,70 @@ repeat {
       n_sims          = 2000
     )
     
-    cat("[리스크] 은퇴 후 30년, 연 2억 인출 시나리오 시뮬레이션 실행...\n")
+    cat("[리스크] 은퇴 후 30년, 연 2억 인출 시나리오(현재자산 기준) 시뮬레이션 실행...\n")
     run_mc_withdraw_from_dd(
       dd,
       years           = 30,
-      annual_withdraw = 200000000,   # 연 2억 인출 가정
+      annual_withdraw = 200000000,
       n_sims          = 5000,
       withdraw_freq   = "monthly"
+      # initial_value 기본값(NULL) → 현재 Sum으로 시작
     )
+    
+    # (선택 예시) 10년 후 60억으로 은퇴했다고 가정한 시나리오도 보고 싶다면:
+    # cat("[리스크] 가정: 10년 후 60억으로 은퇴, 연 2억 인출 시나리오 시뮬레이션...\n")
+    # run_mc_withdraw_from_dd(
+    #   dd,
+    #   years           = 30,
+    #   annual_withdraw = 200000000,
+    #   n_sims          = 5000,
+    #   withdraw_freq   = "monthly",
+    #   initial_value   = 60000000000   # 60억 가정
+    # )
+    weights <- c(
+      asset_SPY_ETC / today_tsum,
+      asset_SCHD    / today_tsum,
+      asset_QQQ     / today_tsum,
+      asset_TQQQ    / today_tsum,
+      asset_GLD     / today_tsum,
+      asset_BOND    / today_tsum
+    )
+    
+    # ★ 팩터 분석: factors_monthly.csv 가 있을 때만 실행 ----------------
+    #  - 예: Date, MKT, VALUE, SIZE, MOM ... 형태의 월간 팩터 수익률 데이터
+    if (file.exists("factors_monthly.csv")) {
+      # ===== PCA 기반 리스크 분해 =====
+      cat("[리스크] PCA 기반 리스크 분해(Principal Component Risk) 실행...\n")
+      #run_pca_dashboard_from_file("asset_returns_monthly.csv", weights)
+    } else {
+      cat("[리스크] 팩터 데이터(factors_monthly.csv)를 찾을 수 없어 팩터 분석을 건너뜁니다.\n")
+    }
+    
+    # ★ PCA 분석: asset_returns_monthly.csv 가 있을 때만 실행 ----------
+    #  - 예: Date, SPY, SCHD, QQQ, TQQQ, GOLD, BOND 형식의 월간 수익률
+    if (file.exists("asset_returns_monthly.csv")) {
+      #cat("[리스크] PCA 기반 리스크 분해(Principal Component Risk) 실행...\n")
+      # 자산별 장기 목표 비중 또는 현재 비중 사용 (예시 비중)
+      # weights <- c(
+      #   0.40,  # SPY등
+      #   0.20,  # SCHD
+      #   0.15,  # QQQ
+      #   0.10,  # TQQQ
+      #   0.10,  # GOLD
+      #   0.05   # BOND
+      # )
+      run_pca_dashboard_from_file("asset_returns_monthly.csv", weights)
+    } else {
+      cat("[리스크] PCA용 자산수익률 파일(asset_returns_monthly.csv)이 없어 PCA 분석을 건너뜁니다.\n")
+    }
     
     last_mc_date <- today_date
   } else {
     cat("\n[리스크] 오늘(", format(today_date),
         ") 몬테카는 이미 실행됨 (다음날 재실행)\n\n", sep = "")
   }
-  # -------------------------------------------------------------------
   
-  # 수익률 축, 합계축 변환 ---------------------------------------------
+  # 이하 부분은 기존 JS 펀드 모니터링 로직 그대로 -------------------
   sum_left  <- dd$Sum / 10000000
   ret_right <- dd$Return * 100
   
@@ -174,7 +211,6 @@ repeat {
   df$Date <- as.Date(df$Date)
   last_date <- max(df$Date, na.rm = TRUE)
   
-  # 비교할 기간 벡터 (1개월, 3개월, 6개월, 12개월)
   periods <- c(1, 3, 6, 12)
   
   result_period <- data.frame(
@@ -189,15 +225,15 @@ repeat {
     target <- seq(last_date, length = 2, by = paste0("-", periods[i], " month"))[2]
     idx <- which.min(abs(df$Date - target))
     closest_date <- df$Date[idx]
-    sum_value <- df$Sum[idx]
+    sum_value_p <- df$Sum[idx]
     latest_sum <- df$Sum[df$Date == last_date]
-    diff_value <- latest_sum - sum_value
+    diff_value <- latest_sum - sum_value_p
     
     result_period[i, ] <- c(
       paste0(periods[i], "개월 전"),
       as.character(target),
       as.character(closest_date),
-      sum_value,
+      sum_value_p,
       diff_value
     )
   }
@@ -205,7 +241,7 @@ repeat {
   result_period$Sum  <- as.numeric(result_period$Sum)
   result_period$Diff <- as.numeric(result_period$Diff)
   
-  # 구성비율 트리맵 -----------------------------------------------
+  # 구성비율 트리맵 ---------------------------------------------------
   dt_ko <- data_ko %>% 
     head(-1) %>% 
     dplyr::select(종목명, 종목번호, 보유증권사, 평가금, 매수가격, 수량)
@@ -222,7 +258,7 @@ repeat {
     mutate(한화평가금 = 평가금 * exchange_rate) %>% 
     mutate(한화매수가격 = 매수가격 * exchange_rate)
   
-  dt_fn <- bind_rows(dt_ko, dt_en)  # 한국주식 + 미국주식
+  dt_fn <- bind_rows(dt_ko, dt_en)
   
   dt_fn <- dt_fn %>% 
     dplyr::select(-평가금) %>% 
@@ -245,7 +281,6 @@ repeat {
     align.labels = list(c("center","center"))
   )
   
-  # Date를 숫자로 변환해 단순 회귀 ------------------------------
   fit <- lm(sum_left ~ as.numeric(Date), data = dd)
   slope_per_day <- coef(fit)[2]
   
@@ -259,7 +294,6 @@ repeat {
     files[which.max(dates[valid_idx])]
   }
   
-  # ── 전일 데이터 불러오기 ──────────────────────────────
   data_prev_ko <- read_excel(get_prev_file("output_stock_"))
   data_prev_en <- read_excel(get_prev_file("output_stock_us_"))
   
@@ -275,7 +309,6 @@ repeat {
   data_prev_fn <- bind_rows(data_prev_ko, data_prev_en) %>%
     arrange(desc(전일한화평가금))
   
-  # ── 오늘 vs 전일 비교 함수 ──────────────────────────────
   join_stock_data <- function(today_df, prev_df) {
     today_df %>%
       distinct(종목번호, 보유증권사, .keep_all = TRUE) %>%
@@ -294,7 +327,6 @@ repeat {
       arrange(desc(한화평가금))
   }
   
-  # 종합 테이블 ---------------------------------------------------------
   rt <- join_stock_data(dt_fn, data_prev_fn) %>%
     mutate(
       총매수금 = 한화매수가격 * 수량,
@@ -305,9 +337,8 @@ repeat {
     dplyr::select(종목명, 보유증권사, 한화매수가격, 수량, 한화평가금, 전일한화평가금,
                   전일대비, 전일대비율, 비중, 총매수금, 총수익금, 총수익률)
   
-  today_tsum <- tail(dd$Sum, 1)  # 오늘 한화평가금 합계
+  today_tsum <- tail(dd$Sum, 1)
   
-  # 자산군별 비중 --------------------------------------------------
   asset_SCHD <- rt %>% filter(str_detect(종목명, "미국배당다우|SCHD")) %>%
     summarise(합계 = sum(한화평가금)) %>% pull(합계)
   asset_QQQ  <- rt %>% filter(str_detect(종목명, "나스닥100|QQQ"),
@@ -357,7 +388,6 @@ repeat {
     format(round(asset_TQQQ_ratio,    1), nsmall = 1)," : ",
     format(round(asset_GLD_ratio,     1), nsmall = 1)," : ",
     format(round(asset_BOND_ratio,    1), nsmall = 1),"\n",
-    
     "SPY등:SCHD:QQQ:TQQQ:금:채권(목표억원  ) = ",
     format(round(today_tsum *  .4  / 100000000, 1), nsmall = 1)," : ",
     format(round(today_tsum *  .2  / 100000000, 1), nsmall = 1)," : ",
@@ -365,7 +395,6 @@ repeat {
     format(round(today_tsum *  .1  / 100000000, 1), nsmall = 1)," : ",
     format(round(today_tsum *  .1  / 100000000, 1), nsmall = 1)," : ",
     format(round(today_tsum *  .05 / 100000000, 1), nsmall = 1), "\n",
-    
     "SPY등:SCHD:QQQ:TQQQ:금:채권(현재억원  ) = ", 
     format(round(asset_SPY_ETC / 100000000, 1), nsmall = 1)," : ",
     format(round(asset_SCHD    / 100000000, 1), nsmall = 1)," : ",
@@ -399,7 +428,6 @@ repeat {
              label = label_text,
              hjust = 0, vjust = 1, size = 5, color = "black")
   
-  # CAGR, MDD 계산 --------------------------------------------------
   calc_cagr <- function(start_date, end_date, start_value, end_value) {
     years <- as.numeric(difftime(end_date, start_date, units = "days")) / 365.25
     (end_value / start_value)^(1 / years) - 1
@@ -452,7 +480,7 @@ repeat {
          y = "Drawdown (%)") +
     theme_minimal(base_size = 13)
   
-  combined_plot <- p / p_dd + plot_layout(heights = c(2, 1))
+  combined_plot <- p / p_dd + patchwork::plot_layout(heights = c(2, 1))
   suppressMessages(print(combined_plot))
   
   print(
@@ -505,39 +533,76 @@ repeat {
   )
   
   print(tail(dd,2))
+  
+  
+  
+  ##### ===========================
+  #####  리스크 엔진 실행 구간
+  ##### ===========================
+  
+  # 현재 포트폴리오 비중 (메인 코드에서 이미 계산됨)
+  weights <- c(
+    SPY_ETC = asset_SPY_ETC_ratio / 100,
+    SCHD    = asset_SCHD_ratio    / 100,
+    QQQ     = asset_QQQ_ratio     / 100,
+    TQQQ    = asset_TQQQ_ratio    / 100,
+    GLD     = asset_GLD_ratio     / 100,
+    BOND    = asset_BOND_ratio    / 100
+  )
+  
+  # 목표 비중
+  target_weights <- c(
+    SPY_ETC = 0.40,
+    SCHD    = 0.20,
+    QQQ     = 0.15,
+    TQQQ    = 0.10,
+    GLD     = 0.10,
+    BOND    = 0.05
+  )
+  
+  current_nav <- tail(dd$Sum, 1)
+  
+  cat("\n\n================ 리스크 분석 시작 ================\n")
+  
+  # 1) Stress Test Replay
+  run_stress_replay_from_file(
+    asset_file     = "asset_returns_monthly.csv",
+    weights        = weights,
+    current_nav    = current_nav,
+    monthly_contrib = 0
+  )
+  
+  # 2) VaR / CVaR
+  run_var_cvar_from_file(
+    asset_file  = "asset_returns_monthly.csv",
+    weights     = weights,
+    current_nav = current_nav,
+    alpha       = 0.95
+  )
+  
+  # 3) DRIFT 기반 리밸런싱 신호
+  run_drift_rebal_signal(
+    target_weights = target_weights,
+    current_weights = weights,
+    threshold = 0.05
+  )
+  
+  cat("================ 리스크 분석 종료 ================\n\n")
+  
+  
+  
+  
   cat("장중 10분 그이외는 1시간 후에 다시 실행됨(중단을 원하면 Interrupt-R 빨간버튼 클릭)",
       format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"),"\n\n")
   
   View(rt)
   
-  # 반복 횟수 증가 ------------------------------------------------------
   count <- count + 1
   
-  # 다음 대기시간 설정 -----------------------------------------------
-  if (in_fast_range & (wday >= 1 & wday <= 5)) {  # 월 ~ 금일 때만
-    wait_min <- 10     # 거래시간대: 10분 간격
+  if (in_fast_range & (wday >= 1 & wday <= 5)) {
+    wait_min <- 10
   } else {
-    wait_min <- 60     # 비거래시간대: 1시간 간격
+    wait_min <- 60
   }
   Sys.sleep(wait_min * 60)
 }
-
-# (끝)
-
-
-# 정리 : 2025-12-12 기준
-# ✔ 1) 현재 포트폴리오 성과 전망
-# 
-# 10년 후 중앙값 53억 + 퇴직금 7억 = 약 60억
-# 
-# ✔ 2) 장기 MDD 위험
-# 
-# 미래 10년 동안 보통 -15% 전후의 하락은 한 번 온다
-# 
-# 매우 정상적인 수준
-# 
-# ✔ 3) 은퇴 후 인출 전략
-# 
-# “지금 은퇴 → 연 2억” → 망하는 게 정상
-# 
-# “10년 후 60억으로 은퇴 → 연 2억” → 매우 안전
