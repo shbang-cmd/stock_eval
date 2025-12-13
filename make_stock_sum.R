@@ -6,7 +6,8 @@
 
 # 1) 필요한 패키지 전부 설치 ------------------------------------------
 pkg <- c("openxlsx", "rvest", "httr", "patchwork", "ggplot2",
-         "readr", "readxl", "dplyr", "scales", "treemap", "DT", "stringr",            "PerformanceAnalytics")
+         "readr", "readxl", "dplyr", "scales", "treemap", "DT", "stringr",            
+         "PerformanceAnalytics", "showtext")
 new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
 if (length(new.pkg)) {
   install.packages(new.pkg, dependencies = TRUE)
@@ -420,7 +421,7 @@ repeat {
     "오늘평가액 : ", comma(round(today_tsum, 0)), "원   ",
     "총수익 : ", comma(round(tail(dd$Profit, 1), 0)),"원" ,
     "(", round(tail(dd$Return, 1)*100, 2), "%)   \n",
-    "전일대비 : ", comma(round(tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1], 0)),
+    "前영업일대비 : ", comma(round(tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1], 0)),
     "원 (",
     ifelse((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) >= 0, "+", ""),
     round((tail(dd$Sum, 2)[2] - tail(dd$Sum, 2)[1]) * 100 / tail(dd$Sum, 1), 2),
@@ -650,6 +651,56 @@ repeat {
   
   
   
+  # 미일 reports 폴더 아래 pdf를 만들어 보고서 남기기
+  date_str <- format(Sys.Date(), "%Y%m%d")
+  out_dir  <- "reports"
+  dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+  
+  pdf_file <- file.path(out_dir, sprintf("Daily_Risk_%s.pdf", date_str))
+  
+  # 기존 파일 있으면 삭제
+  if (file.exists(pdf_file)) file.remove(pdf_file)
+  
+  # -------------------------------
+  # ✅ 한글 폰트 강제 로딩 (핵심)
+  # -------------------------------
+  # install.packages("showtext")  # 1회만 설치
+  library(showtext)
+  
+  font_add(family = "malgun", regular = "C:/Windows/Fonts/malgun.ttf")
+  showtext_auto()
+  
+  # -------------------------------
+  # ✅ PDF는 1번만 열기 (가로 A4)
+  # -------------------------------
+  grDevices::cairo_pdf(
+    filename = pdf_file,
+    width  = 11.69,   # A4 가로
+    height = 8.27
+  )
+  
+  # 1페이지 안에 2x2 배치 (base plot일 때만 의미 있음)
+  par(mfrow = c(2, 2), mar = c(3, 3, 2, 1))
+  
+  # --- 여기에 base plot 4개를 그리시면 2x2로 들어갑니다 ---
+  # plot(equity, type="l", main="한글: Equity", xlab="", ylab="")
+  # plot(dd,     type="l", main="한글: Drawdown", xlab="", ylab="")
+  # plot(calmar, type="l", main="한글: Calmar", xlab="", ylab="")
+  # plot(ulcer,  type="l", main="한글: Ulcer", xlab="", ylab="")
+  
+  # --- combined_plot이 ggplot/patchwork 객체라면 par(mfrow)는 무시됩니다 ---
+  # ggplot은 반드시 print()로 출력해야 PDF에 들어갑니다.
+  print(combined_plot)
+  
+  dev.off()
+  
+  cat("Saved:", pdf_file, "\n")
+  
+  
+  
+  
+  
+  
   
   cat("장중 10분 그이외는 1시간 후에 다시 실행됨(중단을 원하면 Interrupt-R 빨간버튼 클릭)",
       format(Sys.time(), "%Y년 %m월 %d일 %H시 %M분 %S초"),"\n\n")
@@ -665,6 +716,15 @@ repeat {
   }
   Sys.sleep(wait_min * 60)
 }
+
+
+
+
+
+
+
+
+
 
 
 
